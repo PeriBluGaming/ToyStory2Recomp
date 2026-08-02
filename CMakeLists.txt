@@ -34,6 +34,11 @@ if(PSX_RECOMP_UI)
     endif()
     set(RECOMP_UI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/recomp-ui" CACHE PATH
         "Root directory of the recomp-ui launcher repo" FORCE)
+    if(NOT EXISTS "${RECOMP_UI_ROOT}/recomp_ui.cmake")
+        message(FATAL_ERROR
+            "PSX_RECOMP_UI=ON requires the recomp-ui submodule at ${RECOMP_UI_ROOT}. "
+            "Initialize it with `git submodule update --init --recursive` and re-run CMake.")
+    endif()
     include("${RECOMP_UI_ROOT}/recomp_ui.cmake")
     recomp_target_launcher_ui(psx-runtime CONSOLE psx)
 endif()
