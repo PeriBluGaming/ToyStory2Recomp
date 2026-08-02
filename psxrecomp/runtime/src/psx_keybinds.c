@@ -1,0 +1,349 @@
+/*
+ * psx_keybinds.c — configurable keyboard -> DualShock keybinds, INI-driven.
+ *
+ * INI lives next to the exe as keybinds.ini. Auto-generated with the framework's
+ * historical default keyboard layout when missing, so behaviour is unchanged out
+ * of the box. Edit + restart (or rebind live in the launcher's Controls page) to
+ * apply. See psx_keybinds.h for the API contract and the PSX pad-word bit layout.
+ */
+#include "psx_keybinds.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <stddef.h>
+
+/* PSX pad word bits (active-low), standard DualShock layout. Matches the
+ * PAD_* masks in main.cpp / beetle_main.cpp. */
+#define PSXKB_BIT_SELECT   (1u << 0)
+#define PSXKB_BIT_L3       (1u << 1)
+#define PSXKB_BIT_R3       (1u << 2)
+#define PSXKB_BIT_START    (1u << 3)
+#define PSXKB_BIT_UP       (1u << 4)
+#define PSXKB_BIT_RIGHT    (1u << 5)
+#define PSXKB_BIT_DOWN     (1u << 6)
+#define PSXKB_BIT_LEFT     (1u << 7)
+#define PSXKB_BIT_L2       (1u << 8)
+#define PSXKB_BIT_R2       (1u << 9)
+#define PSXKB_BIT_L1       (1u << 10)
+#define PSXKB_BIT_R1       (1u << 11)
+#define PSXKB_BIT_TRIANGLE (1u << 12)
+#define PSXKB_BIT_CIRCLE   (1u << 13)
+#define PSXKB_BIT_CROSS    (1u << 14)
+#define PSXKB_BIT_SQUARE   (1u << 15)
+
+/* ── Defaults ─────────────────────────────────────────────────────────────── */
+/*
+ * Player 1 reproduces the framework's historical hardcoded keyboard mapping
+ * (pad_from_keyboard / pad_sticks_for in main.cpp), so shipping keybinds.ini
+ * with defaults changes nothing until the user edits it:
+ *   D-pad: Arrow keys      Start: Return     Select: Right Shift
+ *   Cross: X   Circle: S   Square: Z   Triangle: A
+ *   L1: Q  R1: W  L2: E  R2: R  L3: T  R3: Y (stick clicks continue the
+ *   shoulder row; DualShock-only games like Ape Escape require L3/R3)
+ *   Left analog stick: Arrow keys (matches the old keyboard analog path)
+ *   Right analog stick: unbound (the keyboard never drove it before)
+ * Player 2 is fully unbound (add binds to enable a 2nd keyboard player).
+ */
+#define PSXKB_DEFAULTS { \
+    .p1 = { \
+        .up = SDL_SCANCODE_UP, .down = SDL_SCANCODE_DOWN, \
+        .left = SDL_SCANCODE_LEFT, .right = SDL_SCANCODE_RIGHT, \
+        .cross = SDL_SCANCODE_X, .circle = SDL_SCANCODE_S, \
+        .square = SDL_SCANCODE_Z, .triangle = SDL_SCANCODE_A, \
+        .l1 = SDL_SCANCODE_Q, .r1 = SDL_SCANCODE_W, \
+        .l2 = SDL_SCANCODE_E, .r2 = SDL_SCANCODE_R, \
+        .l3 = SDL_SCANCODE_T, .r3 = SDL_SCANCODE_Y, \
+        .start = SDL_SCANCODE_RETURN, .select = SDL_SCANCODE_RSHIFT, \
+        .ls_up = SDL_SCANCODE_UP, .ls_down = SDL_SCANCODE_DOWN, \
+        .ls_left = SDL_SCANCODE_LEFT, .ls_right = SDL_SCANCODE_RIGHT, \
+        .rs_up = SDL_SCANCODE_UNKNOWN, .rs_down = SDL_SCANCODE_UNKNOWN, \
+        .rs_left = SDL_SCANCODE_UNKNOWN, .rs_right = SDL_SCANCODE_UNKNOWN, \
+    }, \
+    .p2 = { \
+        .up = SDL_SCANCODE_UNKNOWN, .down = SDL_SCANCODE_UNKNOWN, \
+        .left = SDL_SCANCODE_UNKNOWN, .right = SDL_SCANCODE_UNKNOWN, \
+        .cross = SDL_SCANCODE_UNKNOWN, .circle = SDL_SCANCODE_UNKNOWN, \
+        .square = SDL_SCANCODE_UNKNOWN, .triangle = SDL_SCANCODE_UNKNOWN, \
+        .l1 = SDL_SCANCODE_UNKNOWN, .r1 = SDL_SCANCODE_UNKNOWN, \
+        .l2 = SDL_SCANCODE_UNKNOWN, .r2 = SDL_SCANCODE_UNKNOWN, \
+        .l3 = SDL_SCANCODE_UNKNOWN, .r3 = SDL_SCANCODE_UNKNOWN, \
+        .start = SDL_SCANCODE_UNKNOWN, .select = SDL_SCANCODE_UNKNOWN, \
+        .ls_up = SDL_SCANCODE_UNKNOWN, .ls_down = SDL_SCANCODE_UNKNOWN, \
+        .ls_left = SDL_SCANCODE_UNKNOWN, .ls_right = SDL_SCANCODE_UNKNOWN, \
+        .rs_up = SDL_SCANCODE_UNKNOWN, .rs_down = SDL_SCANCODE_UNKNOWN, \
+        .rs_left = SDL_SCANCODE_UNKNOWN, .rs_right = SDL_SCANCODE_UNKNOWN, \
+    }, \
+}
+
+static PsxKeyBinds       s_binds         = PSXKB_DEFAULTS;
+static const PsxKeyBinds s_default_binds = PSXKB_DEFAULTS;
+
+typedef struct {
+    const char *name;   /* ini key */
+    const char *label;  /* pretty label for the launcher */
+    size_t      offset; /* offset into PsxPlayerBinds */
+    uint16_t    bit;    /* PSX pad-word bit, 0 for non-button (stick) inputs */
+} ButtonDef;
+
+static const ButtonDef s_buttons[] = {
+    { "up",       "Up",         offsetof(PsxPlayerBinds, up),       PSXKB_BIT_UP       },
+    { "down",     "Down",       offsetof(PsxPlayerBinds, down),     PSXKB_BIT_DOWN     },
+    { "left",     "Left",       offsetof(PsxPlayerBinds, left),     PSXKB_BIT_LEFT     },
+    { "right",    "Right",      offsetof(PsxPlayerBinds, right),    PSXKB_BIT_RIGHT    },
+    { "cross",    "Cross (X)",  offsetof(PsxPlayerBinds, cross),    PSXKB_BIT_CROSS    },
+    { "circle",   "Circle (O)", offsetof(PsxPlayerBinds, circle),   PSXKB_BIT_CIRCLE   },
+    { "square",   "Square",     offsetof(PsxPlayerBinds, square),   PSXKB_BIT_SQUARE   },
+    { "triangle", "Triangle",   offsetof(PsxPlayerBinds, triangle), PSXKB_BIT_TRIANGLE },
+    { "l1",       "L1",         offsetof(PsxPlayerBinds, l1),       PSXKB_BIT_L1       },
+    { "r1",       "R1",         offsetof(PsxPlayerBinds, r1),       PSXKB_BIT_R1       },
+    { "l2",       "L2",         offsetof(PsxPlayerBinds, l2),       PSXKB_BIT_L2       },
+    { "r2",       "R2",         offsetof(PsxPlayerBinds, r2),       PSXKB_BIT_R2       },
+    { "l3",       "L3 (stick)", offsetof(PsxPlayerBinds, l3),       PSXKB_BIT_L3       },
+    { "r3",       "R3 (stick)", offsetof(PsxPlayerBinds, r3),       PSXKB_BIT_R3       },
+    { "start",    "Start",      offsetof(PsxPlayerBinds, start),    PSXKB_BIT_START    },
+    { "select",   "Select",     offsetof(PsxPlayerBinds, select),   PSXKB_BIT_SELECT   },
+    { "ls_up",    "L-Stick Up",    offsetof(PsxPlayerBinds, ls_up),    0 },
+    { "ls_down",  "L-Stick Down",  offsetof(PsxPlayerBinds, ls_down),  0 },
+    { "ls_left",  "L-Stick Left",  offsetof(PsxPlayerBinds, ls_left),  0 },
+    { "ls_right", "L-Stick Right", offsetof(PsxPlayerBinds, ls_right), 0 },
+    { "rs_up",    "R-Stick Up",    offsetof(PsxPlayerBinds, rs_up),    0 },
+    { "rs_down",  "R-Stick Down",  offsetof(PsxPlayerBinds, rs_down),  0 },
+    { "rs_left",  "R-Stick Left",  offsetof(PsxPlayerBinds, rs_left),  0 },
+    { "rs_right", "R-Stick Right", offsetof(PsxPlayerBinds, rs_right), 0 },
+};
+#define PSXKB_N ((int)(sizeof(s_buttons) / sizeof(s_buttons[0])))
+
+/* ── INI parsing helpers ──────────────────────────────────────────────────── */
+
+static void trim(char *s) {
+    size_t n = strlen(s);
+    while (n > 0 && isspace((unsigned char)s[n-1])) s[--n] = '\0';
+    char *start = s;
+    while (*start && isspace((unsigned char)*start)) start++;
+    if (start != s) memmove(s, start, strlen(start) + 1);
+}
+
+static SDL_Scancode name_to_scancode(const char *name) {
+    if (!name || !*name) return SDL_SCANCODE_UNKNOWN;
+    SDL_Scancode sc = SDL_GetScancodeFromName(name);
+    if (sc != SDL_SCANCODE_UNKNOWN) return sc;
+    char buf[32];
+    size_t i = 0;
+    for (; name[i] && i < sizeof(buf) - 1; i++) buf[i] = (char)tolower((unsigned char)name[i]);
+    buf[i] = '\0';
+    if (!strcmp(buf, "enter") || !strcmp(buf, "return")) return SDL_SCANCODE_RETURN;
+    if (!strcmp(buf, "tab"))                              return SDL_SCANCODE_TAB;
+    if (!strcmp(buf, "space"))                            return SDL_SCANCODE_SPACE;
+    if (!strcmp(buf, "lshift"))                           return SDL_SCANCODE_LSHIFT;
+    if (!strcmp(buf, "rshift"))                           return SDL_SCANCODE_RSHIFT;
+    if (!strcmp(buf, "lctrl"))                            return SDL_SCANCODE_LCTRL;
+    if (!strcmp(buf, "rctrl"))                            return SDL_SCANCODE_RCTRL;
+    if (!strcmp(buf, "lalt"))                             return SDL_SCANCODE_LALT;
+    if (!strcmp(buf, "ralt"))                             return SDL_SCANCODE_RALT;
+    if (!strcmp(buf, "backslash"))                        return SDL_SCANCODE_BACKSLASH;
+    if (!strcmp(buf, "escape") || !strcmp(buf, "esc"))    return SDL_SCANCODE_ESCAPE;
+    if (!strcmp(buf, "backspace"))                        return SDL_SCANCODE_BACKSPACE;
+    if (!strcmp(buf, "none") || !strcmp(buf, ""))         return SDL_SCANCODE_UNKNOWN;
+    return SDL_SCANCODE_UNKNOWN;
+}
+
+static const char *scancode_to_name(SDL_Scancode sc) {
+    if (sc == SDL_SCANCODE_UNKNOWN) return "None";
+    const char *name = SDL_GetScancodeName(sc);
+    return (name && name[0]) ? name : "None";
+}
+
+/* ── File I/O ─────────────────────────────────────────────────────────────── */
+
+static char s_ini_path[1024] = {0};
+
+/* Resolve keybinds.ini alongside exe_path. exe_path may be a file (argv[0] /
+ * the exe) or a directory (the exe dir the launcher passes) — either works. */
+static void derive_ini_path(const char *exe_path) {
+    if (!exe_path || !*exe_path) {
+        strcpy(s_ini_path, "keybinds.ini");
+        return;
+    }
+    /* Find the last path separator; if none, treat the whole thing as a dir. */
+    const char *slash = NULL;
+    for (const char *p = exe_path; *p; p++)
+        if (*p == '/' || *p == '\\') slash = p;
+
+    /* Heuristic: a path ending in a separator, or with no extension in the last
+     * component, is treated as a directory; otherwise strip the file name. */
+    size_t len = strlen(exe_path);
+    int ends_sep = (exe_path[len-1] == '/' || exe_path[len-1] == '\\');
+    const char *last = slash ? slash + 1 : exe_path;
+    int has_ext = strchr(last, '.') != NULL;
+
+    char dir[1024];
+    if (ends_sep) {
+        snprintf(dir, sizeof(dir), "%s", exe_path);
+    } else if (!has_ext) {
+        /* directory path without trailing sep */
+        snprintf(dir, sizeof(dir), "%s/", exe_path);
+    } else if (slash) {
+        size_t dl = (size_t)(slash - exe_path) + 1;
+        if (dl >= sizeof(dir)) dl = sizeof(dir) - 1;
+        memcpy(dir, exe_path, dl);
+        dir[dl] = '\0';
+    } else {
+        dir[0] = '\0';
+    }
+    snprintf(s_ini_path, sizeof(s_ini_path), "%skeybinds.ini", dir);
+}
+
+static void write_player_section(FILE *f, const char *section, const PsxPlayerBinds *pb) {
+    fprintf(f, "[%s]\n", section);
+    for (int i = 0; i < PSXKB_N; i++) {
+        SDL_Scancode sc = *(const SDL_Scancode *)((const char *)pb + s_buttons[i].offset);
+        fprintf(f, "%-9s = %s\n", s_buttons[i].name, scancode_to_name(sc));
+    }
+    fprintf(f, "\n");
+}
+
+static void write_ini(const char *path) {
+    FILE *f = fopen(path, "w");
+    if (!f) return;
+    fprintf(f,
+        "# PSXRecomp Keyboard Keybinds (keyboard -> DualShock).\n"
+        "# Edit values and restart, or rebind live in the launcher's Controls page.\n"
+        "# Use SDL key names. Common: A B C ... Z, 0-9, F1-F12, Up Down Left Right,\n"
+        "# Return, Tab, Space, Left Shift, Right Shift, Left Ctrl, Right Ctrl,\n"
+        "# Backspace, Escape, Backslash. Use \"None\" to leave an input unbound.\n"
+        "#\n"
+        "# Buttons: up/down/left/right, cross/circle/square/triangle, l1/r1/l2/r2,\n"
+        "# l3/r3 (stick clicks), start/select. ls_* / rs_* are the left/right\n"
+        "# analog-stick DIRECTIONS driven from the keyboard (analog pad modes).\n"
+        "#\n"
+        "# Player 2 is unbound by default — fill in keys to enable a second\n"
+        "# keyboard player (route a port to \"Keyboard\" in the launcher).\n"
+        "\n");
+    write_player_section(f, "player1", &s_binds.p1);
+    write_player_section(f, "player2", &s_binds.p2);
+    fclose(f);
+    printf("[Keybinds] Wrote %s\n", path);
+}
+
+static void load_ini(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    PsxPlayerBinds *current = NULL;
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        trim(line);
+        if (!line[0] || line[0] == '#' || line[0] == ';') continue;
+        if (line[0] == '[') {
+            char *end = strchr(line, ']');
+            if (end) *end = '\0';
+            const char *section = line + 1;
+            current = NULL;
+            if (!strcmp(section, "player1"))      current = &s_binds.p1;
+            else if (!strcmp(section, "player2")) current = &s_binds.p2;
+            continue;
+        }
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        char *key = line, *val = eq + 1;
+        trim(key); trim(val);
+        for (char *c = key; *c; c++) *c = (char)tolower((unsigned char)*c);
+        if (!current) continue;
+        for (int i = 0; i < PSXKB_N; i++) {
+            if (!strcmp(key, s_buttons[i].name)) {
+                *(SDL_Scancode *)((char *)current + s_buttons[i].offset) = name_to_scancode(val);
+                break;
+            }
+        }
+    }
+    fclose(f);
+    printf("[Keybinds] Loaded %s\n", path);
+}
+
+/* ── Public API ───────────────────────────────────────────────────────────── */
+
+void psx_keybinds_init(const char *exe_path) {
+    derive_ini_path(exe_path);
+    FILE *test = fopen(s_ini_path, "r");
+    if (test) { fclose(test); load_ini(s_ini_path); }
+    else       write_ini(s_ini_path);
+}
+
+const PsxKeyBinds *psx_keybinds_get(void) { return &s_binds; }
+
+static const PsxPlayerBinds *player_binds_c(int player) {
+    return (player == 2) ? &s_binds.p2 : &s_binds.p1;
+}
+static PsxPlayerBinds *player_binds(int player) {
+    return (player == 2) ? &s_binds.p2 : &s_binds.p1;
+}
+
+/* Is the scancode at button-def index i currently held for this player? */
+static int held(const uint8_t *keys, const PsxPlayerBinds *pb, int i) {
+    SDL_Scancode sc = *(const SDL_Scancode *)((const char *)pb + s_buttons[i].offset);
+    return sc != SDL_SCANCODE_UNKNOWN && keys[sc];
+}
+
+uint16_t psx_keybinds_pad_word(const uint8_t *keys, int player) {
+    if (!keys) return 0xFFFF;
+    const PsxPlayerBinds *pb = player_binds_c(player);
+    uint16_t b = 0xFFFF;   /* active-low: all released */
+    for (int i = 0; i < PSXKB_N; i++) {
+        if (s_buttons[i].bit && held(keys, pb, i))
+            b &= (uint16_t)~s_buttons[i].bit;
+    }
+    return b;
+}
+
+void psx_keybinds_sticks(const uint8_t *keys, int player, uint8_t out[4]) {
+    if (!keys || !out) return;
+    const PsxPlayerBinds *pb = player_binds_c(player);
+    if (held(keys, pb, PSX_KB_LS_LEFT))  out[0] = 0x00;
+    if (held(keys, pb, PSX_KB_LS_RIGHT)) out[0] = 0xFF;
+    if (held(keys, pb, PSX_KB_LS_UP))    out[1] = 0x00;
+    if (held(keys, pb, PSX_KB_LS_DOWN))  out[1] = 0xFF;
+    if (held(keys, pb, PSX_KB_RS_LEFT))  out[2] = 0x00;
+    if (held(keys, pb, PSX_KB_RS_RIGHT)) out[2] = 0xFF;
+    if (held(keys, pb, PSX_KB_RS_UP))    out[3] = 0x00;
+    if (held(keys, pb, PSX_KB_RS_DOWN))  out[3] = 0xFF;
+}
+
+int psx_keybinds_dpad_active(const uint8_t *keys, int player) {
+    if (!keys) return 0;
+    const PsxPlayerBinds *pb = player_binds_c(player);
+    return held(keys, pb, PSX_KB_UP)   || held(keys, pb, PSX_KB_DOWN) ||
+           held(keys, pb, PSX_KB_LEFT) || held(keys, pb, PSX_KB_RIGHT);
+}
+
+/* ── Rebind API ───────────────────────────────────────────────────────────── */
+
+int psx_keybinds_button_count(void) { return PSXKB_N; }
+
+const char *psx_keybinds_button_name(int button) {
+    if (button < 0 || button >= PSXKB_N) return "?";
+    return s_buttons[button].name;
+}
+const char *psx_keybinds_button_label(int button) {
+    if (button < 0 || button >= PSXKB_N) return "?";
+    return s_buttons[button].label;
+}
+
+SDL_Scancode psx_keybinds_get_button(int player, int button) {
+    if (button < 0 || button >= PSXKB_N) return SDL_SCANCODE_UNKNOWN;
+    return *(SDL_Scancode *)((char *)player_binds(player) + s_buttons[button].offset);
+}
+
+void psx_keybinds_set_button(int player, int button, SDL_Scancode sc) {
+    if (button < 0 || button >= PSXKB_N) return;
+    *(SDL_Scancode *)((char *)player_binds(player) + s_buttons[button].offset) = sc;
+}
+
+void psx_keybinds_reset_player(int player) {
+    *player_binds(player) = (player == 2) ? s_default_binds.p2 : s_default_binds.p1;
+}
+
+void psx_keybinds_save(void) {
+    if (!s_ini_path[0]) strcpy(s_ini_path, "keybinds.ini");
+    write_ini(s_ini_path);
+}

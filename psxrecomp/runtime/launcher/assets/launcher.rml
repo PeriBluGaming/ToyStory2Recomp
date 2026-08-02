@@ -1,0 +1,473 @@
+<rml>
+<head>
+<title>PSX Launcher</title>
+<style>
+body {
+	font-family: LatoLatin;
+	color: #e6e9ef;
+	background-color: #0b0e14;
+	font-size: 15dp;
+}
+#root { width: 100%; height: 100%; display: block; overflow-y: auto; }
+#frame { display: block; padding: 22dp 26dp; }
+
+/* ---- top bar ---- */
+.topbar { display: flex; flex-direction: row; align-items: center; margin-bottom: 18dp; }
+.logo { width: 46dp; height: 46dp; margin-right: 16dp; decorator: image(img/logo.png contain); }
+.title-block { display: block; flex: 1 1 auto; }
+.topbar-actions { display: flex; flex-direction: row; align-items: center; }
+.top-btn {
+	background-color: #1b2330; border: 1dp #2b3543; border-radius: 7dp;
+	color: #e6e9ef; padding: 9dp 18dp; font-size: 15dp; font-weight: bold;
+}
+.top-btn:hover { background-color: #232d3c; border-color: #3b82f6; }
+.top-btn.primary { background-color: #1e2733; }
+h1 { display: block; font-size: 27dp; font-weight: bold; color: #ffffff; }
+.subtitle { display: block; color: #7d8590; font-size: 14dp; }
+
+/* ---- generic panels / cards ---- */
+.panel {
+	display: block;
+	background-color: #11161f;
+	border: 1dp #1e2733;
+	border-radius: 12dp;
+	padding: 18dp 22dp;
+	margin-bottom: 13dp;
+}
+/* Settings view: two side-by-side columns so the panels use the horizontal
+   space and the view fits without scrolling. SYSTEM stays full-width below
+   (its BIOS/disc paths need the room). */
+.settings-cols { display: flex; flex-direction: row; align-items: flex-start; }
+.settings-col { display: block; flex: 1 1 0; min-width: 0; }
+.settings-col:first-child { margin-right: 13dp; }
+.cards-row { display: flex; flex-direction: row; align-items: stretch; margin-bottom: 13dp; }
+.card {
+	display: block;
+	/* flex-basis 0 + min-width 0 so the two cards always split the row exactly
+	 * 50/50 regardless of their content. (flex-basis:auto sized each card to its
+	 * content, so selecting a controller widened that card.) */
+	flex: 1 1 0dp;
+	min-width: 0dp;
+	background-color: #11161f;
+	border: 1dp #1e2733;
+	border-radius: 12dp;
+	padding: 18dp 20dp;
+}
+.card.left  { margin-right: 8dp; }
+.card.right { margin-left: 8dp; }
+.eyebrow { display: block; color: #4493f8; font-size: 12dp; font-weight: bold; margin-bottom: 8dp; }
+
+/* ---- disc verification panel ---- */
+.disc-panel { display: flex; flex-direction: row; align-items: flex-start; position: relative; }
+.disc-art { width: 216dp; height: 216dp; margin-right: 24dp; decorator: image(img/disc.png contain); flex: 0 0 216dp; }
+.disc-info { display: block; flex: 1 1 auto; }
+.disc-title { display: block; font-size: 32dp; font-weight: bold; color: #ffffff; }
+.disc-sub { display: block; color: #9aa4b2; font-size: 16dp; margin-bottom: 16dp; }
+.meta-row { display: flex; flex-direction: row; margin-bottom: 16dp; }
+.meta { display: block; margin-right: 40dp; }
+.meta-k { display: block; color: #6e7781; font-size: 11dp; font-weight: bold; margin-bottom: 3dp; }
+.meta-v { display: block; color: #e6e9ef; font-size: 15dp; }
+.results { display: block; border-top: 1dp #1e2733; padding-top: 12dp; }
+.results-title { display: block; color: #4493f8; font-size: 11dp; font-weight: bold; margin-bottom: 8dp; }
+.checks { display: flex; flex-direction: row; }
+.check { display: flex; flex-direction: row; align-items: center; margin-right: 28dp; }
+.check-icon { width: 18dp; height: 18dp; margin-right: 7dp; decorator: image(img/check_off.png); }
+.check-icon.on { decorator: image(img/check_on.png); }
+.check-lbl { color: #c2c9d2; font-size: 14dp; }
+
+/* verdict column on the right of the disc panel */
+.disc-verdict { display: flex; flex-direction: row; align-items: center; flex: 0 0 290dp;
+	margin-left: 24dp; border-left: 1dp #1e2733; padding-left: 24dp; }
+.verdict-icon { width: 50dp; height: 50dp; margin-right: 14dp; }
+.verdict-icon.ok   { decorator: image(img/verdict_ok.png); }
+.verdict-icon.warn { decorator: image(img/verdict_warn.png); }
+.verdict-icon.bad  { decorator: image(img/verdict_bad.png); }
+.verdict-icon.none { decorator: image(img/verdict_none.png); }
+.verdict-text { display: block; }
+.verdict-title { display: block; font-size: 18dp; font-weight: bold; color: #ffffff; }
+.verdict-detail { display: block; color: #8b949e; font-size: 13dp; }
+.change-iso { position: absolute; top: 20dp; right: 22dp; }
+
+button {
+	background-color: #1b2330;
+	border: 1dp #2b3543;
+	border-radius: 7dp;
+	color: #e6e9ef;
+	padding: 8dp 14dp;
+}
+button:hover { background-color: #232d3c; }
+
+/* ---- player / memcard card chrome ---- */
+.card-head { display: flex; flex-direction: row; align-items: center; margin-bottom: 14dp; }
+.card-icon { width: 18dp; height: 18dp; margin-right: 8dp; }
+.card-name { color: #cdd5df; font-size: 12dp; font-weight: bold; flex: 1 1 auto; }
+.enable-lbl { color: #8b949e; font-size: 13dp; margin-right: 8dp; }
+.switch { width: 42dp; height: 22dp; border-radius: 11dp; background-color: #2b3543; display: block; }
+.switch.on { background-color: #2563eb; }
+.knob { display: block; width: 16dp; height: 16dp; border-radius: 8dp; background-color: #e6e9ef; margin: 3dp 0dp 0dp 3dp; }
+.switch.on .knob { margin-left: 23dp; }
+
+/* Pad-mode 3-way segmented selector (Hybrid | Analog | D-Pad). */
+.seg { display: flex; flex-direction: row; align-items: center; position: relative;
+	background-color: #161d28; border: 1dp #2b3543; border-radius: 7dp; }
+.seg-opt { display: block; padding: 5dp 11dp; color: #8b949e; font-size: 12dp; border-radius: 6dp; }
+.seg-opt:hover { color: #cdd5df; }
+.seg-opt.on { background-color: #2563eb; color: #ffffff; }
+/* Hybrid carries the explanatory tooltip, revealed on hover. */
+.seg-tip { display: none; position: absolute; top: 34dp; right: 0dp; width: 250dp; z-index: 80;
+	background-color: #0d1219; border: 1dp #3b82f6; border-radius: 7dp;
+	padding: 10dp 12dp; color: #cdd5df; font-size: 11dp; line-height: 16dp; }
+.seg-opt.hybrid:hover .seg-tip { display: block; }
+
+.card-body { display: flex; flex-direction: row; align-items: center; }
+.card-body.disabled { opacity: 0.4; }
+/* Player card body is a fixed height so toggling the pad type never reflows. */
+.card-body.player { height: 134dp; }
+.pad-art { width: 206dp; height: 128dp; margin-right: 14dp; flex: 0 0 206dp; }
+.pad-art.digital { decorator: image(img/pad_digital.png contain); }
+.pad-art.analog  { decorator: image(img/pad_analog.png contain); }
+.card-col { display: block; flex: 1 1 auto; }
+.field-lbl { display: block; color: #8b949e; font-size: 12dp; margin-bottom: 5dp; }
+.dropdown-wrap { display: block; position: relative; margin-bottom: 12dp; }
+.dropdown {
+	display: flex; flex-direction: row; align-items: center;
+	background-color: #161d28; border: 1dp #2b3543; border-radius: 7dp;
+	padding: 9dp 12dp; color: #e6e9ef;
+}
+.dropdown:hover { border-color: #3b82f6; }
+.dd-label { flex: 1 1 auto; white-space: nowrap; overflow: hidden; }
+.caret { width: 13dp; height: 13dp; margin-left: 8dp; flex: 0 0 13dp;
+	decorator: image(img/caret.png contain); }
+.dd-panel {
+	position: absolute; left: 0dp; top: 44dp; width: 100%; z-index: 50;
+	background-color: #0d131c; border: 1dp #2b3543; border-radius: 7dp; padding: 4dp;
+}
+.dd-opt { display: block; padding: 8dp 10dp; border-radius: 5dp; color: #c2c9d2; }
+.dd-opt:hover { background-color: #1b2330; color: #ffffff; }
+.status-row { display: flex; flex-direction: row; align-items: center; }
+.dot { width: 9dp; height: 9dp; border-radius: 5dp; background-color: #3fb950; margin-right: 7dp; flex: 0 0 9dp; }
+.dot.off { background-color: #6e7781; }
+.status-txt { color: #9aa4b2; font-size: 13dp; flex: 1 1 auto;
+	white-space: nowrap; overflow: hidden; min-width: 0dp; }
+
+/* memcard */
+.mc-art { width: 118dp; height: 132dp; margin-right: 16dp; flex: 0 0 118dp; decorator: image(img/memcard.png contain); }
+.mc-name { display: block; font-size: 20dp; font-weight: bold; color: #ffffff; margin-bottom: 10dp; }
+.mc-btns { display: flex; flex-direction: row; margin-bottom: 12dp; }
+.mc-btns button { margin-right: 8dp; }
+.mc-stats { display: flex; flex-direction: row; margin-bottom: 10dp; }
+.mc-stat { display: block; margin-right: 30dp; }
+.blocks { display: flex; flex-direction: row; }
+.blk { width: 13dp; height: 16dp; border: 1dp #2b3543; border-radius: 2dp; margin-right: 2dp; }
+.blk.b { background-color: #2563eb; border-color: #2563eb; }
+.blk.p { background-color: #8957e5; border-color: #8957e5; }
+.mc-foot { display: block; color: #6e7781; font-size: 12dp; margin-top: 8dp; }
+
+/* ---- settings view ---- */
+.set-row { display: flex; flex-direction: row; align-items: center; height: 34dp; margin-bottom: 8dp; }
+.set-lbl { width: 230dp; flex: 0 0 230dp; color: #adbac7; }
+.set-ctl { flex: 1 1 auto; display: flex; flex-direction: row; align-items: center; }
+.toggle { width: 132dp; text-align: center; }
+.toggle.wide { width: 164dp; }
+.value { color: #ffffff; font-weight: bold; }
+.exp-tag { display: inline-block; font-size: 10dp; color: #d29922; background-color: #2a2410;
+	border: 1dp #5c4a12; border-radius: 4dp; padding: 0dp 5dp; margin-left: 8dp; font-weight: bold; }
+.ws-hint { color: #7d8590; font-size: 12dp; margin-left: 12dp; }
+.path { flex: 1 1 auto; min-width: 0dp; margin-left: 12dp; color: #7d8590;
+	white-space: nowrap; overflow: hidden; }
+.path.empty { color: #f85149; }
+
+/* ---- controls / keybind rebind view ---- */
+.kb-head { display: flex; flex-direction: row; align-items: center; margin-bottom: 16dp; }
+.kb-player-lbl { color: #adbac7; margin-right: 10dp; }
+.kb-hint { color: #7d8590; font-size: 12dp; margin-left: 18dp; flex: 1 1 auto;
+	white-space: nowrap; overflow: hidden; }
+.kb-reset { background-color: #1b2330; border: 1dp #2b3543; border-radius: 7dp;
+	color: #e6e9ef; padding: 7dp 14dp; margin-left: 12dp; }
+.kb-reset:hover { border-color: #3b82f6; }
+.rebind-list { display: block; }
+.rb-row { display: flex; flex-direction: row; align-items: center; margin-bottom: 8dp; }
+.rb-label { width: 130dp; flex: 0 0 130dp; color: #adbac7; font-size: 13dp; }
+.rb-chip { width: 150dp; flex: 0 0 150dp; text-align: center; margin-right: 34dp;
+	background-color: #161d28; border: 1dp #2b3543; border-radius: 7dp;
+	color: #e6e9ef; padding: 7dp 10dp; }
+.rb-chip:hover { border-color: #3b82f6; }
+.rb-chip--scan { border-color: #f0b429; color: #f0b429; }
+
+/* ---- footer ---- */
+.footer { display: flex; flex-direction: row; align-items: center; margin-top: 6dp;
+	border-top: 1dp #1e2733; padding-top: 16dp; }
+.foot-link { color: #8b949e; margin-right: 22dp; }
+.foot-link:hover { color: #e6e9ef; }
+.skip-lbl { color: #adbac7; font-size: 13dp; margin-left: 9dp; margin-right: 22dp; }
+.foot-status { display: flex; flex-direction: row; align-items: center; flex: 1 1 auto; }
+#launch {
+	background-color: #2563eb; border-color: #3b82f6; color: #ffffff; font-weight: bold;
+	font-size: 16dp; padding: 12dp 34dp;
+}
+#launch:hover { background-color: #3b82f6; }
+.back-btn { margin-right: 14dp; }
+
+/* ---- confirmation modal ---- */
+.modal-backdrop { position: fixed; left: 0dp; top: 0dp; width: 100%; height: 100%;
+	background-color: #000000cc; display: flex; flex-direction: row; align-items: center; z-index: 100; }
+.modal-box { display: block; width: 460dp; margin: 0dp auto;
+	background-color: #11161f; border: 1dp #2b3543; border-radius: 12dp; padding: 22dp 24dp; }
+.modal-title { display: block; font-size: 19dp; font-weight: bold; color: #ffffff; margin-bottom: 10dp; }
+.modal-text { display: block; color: #adbac7; font-size: 14dp; line-height: 20dp; margin-bottom: 20dp; }
+.modal-btns { display: flex; flex-direction: row; align-items: center; }
+.modal-spacer { flex: 1 1 auto; }
+.modal-btns button { margin-left: 10dp; }
+.modal-confirm { background-color: #2563eb; border-color: #3b82f6; color: #ffffff; font-weight: bold; }
+.modal-confirm:hover { background-color: #3b82f6; }
+</style>
+</head>
+
+<body id="root" data-model="settings">
+<div id="frame">
+
+	<div class="topbar">
+		<div class="logo"></div>
+		<div class="title-block">
+			<h1>{{game_name}} Recomp</h1>
+			<div class="subtitle">{{game_name}} launcher</div>
+		</div>
+		<div class="topbar-actions">
+			<button class="top-btn" data-if="view == 'dashboard'" data-event-click="show_controls">Controls</button>
+			<button class="top-btn" data-if="view == 'dashboard'" data-event-click="show_settings">Settings</button>
+			<button class="top-btn primary" data-if="view == 'settings'" data-event-click="show_dashboard">‹ Back to dashboard</button>
+			<button class="top-btn primary" data-if="view == 'controls'" data-event-click="show_dashboard">‹ Back to dashboard</button>
+		</div>
+	</div>
+
+	<!-- ================= DASHBOARD VIEW ================= -->
+	<div data-if="view == 'dashboard'">
+
+		<div class="panel disc-panel">
+			<div class="disc-art"></div>
+			<div class="disc-info">
+				<div class="eyebrow">DISC VERIFICATION</div>
+				<div class="disc-title">{{game_name}}</div>
+				<div class="disc-sub">PlayStation disc image</div>
+				<div class="meta-row">
+					<div class="meta"><div class="meta-k">FILE</div><div class="meta-v">{{disc_file}}</div></div>
+					<div class="meta"><div class="meta-k">REGION</div><div class="meta-v">{{disc_region}}</div></div>
+					<div class="meta"><div class="meta-k">SERIAL</div><div class="meta-v">{{disc_serial}}</div></div>
+				</div>
+				<div class="results">
+					<div class="results-title">VERIFICATION RESULTS</div>
+					<div class="checks">
+						<span class="check"><span class="check-icon" data-class-on="v_header"></span><span class="check-lbl">Header Match</span></span>
+						<span class="check"><span class="check-icon" data-class-on="v_crc"></span><span class="check-lbl">CRC / Hash Match</span></span>
+						<span class="check"><span class="check-icon" data-class-on="v_verified"></span><span class="check-lbl">Disc Verified</span></span>
+					</div>
+				</div>
+			</div>
+			<button class="change-iso" data-event-click="change_iso">Change ISO</button>
+		</div>
+
+		<div class="cards-row" data-if="device_locked == false">
+			<div class="card left">
+				<div class="card-head">
+					<span class="card-name">PLAYER 1</span>
+					<div class="seg" data-if="mode_selectable">
+						<span class="seg-opt hybrid" data-if="allow_hybrid" data-class-on="p1_mode == 0" data-event-click="set_mode_p1(0)">Hybrid<span class="seg-tip">Nudge the analog stick for smooth analog movement, or use the D-pad for classic digital control. It switches automatically based on what you touch.</span></span>
+						<span class="seg-opt" data-class-on="p1_mode == 1" data-event-click="set_mode_p1(1)">Analog</span>
+						<span class="seg-opt" data-class-on="p1_mode == 2" data-event-click="set_mode_p1(2)">D-Pad</span>
+					</div>
+				</div>
+				<div class="card-body player">
+					<div class="pad-art" data-class-analog="p1_mode != 2" data-class-digital="p1_mode == 2"></div>
+					<div class="card-col">
+						<div class="field-lbl">Device</div>
+						<div class="dropdown-wrap">
+							<div class="dropdown" data-event-click="open_dd(0)">
+								<span class="dd-label">{{p1_dev_label}}</span><span class="caret"></span>
+							</div>
+							<div class="dd-panel" data-if="dd_open == 'p1'" data-rml="p1_options"></div>
+						</div>
+						<div class="status-row"><span class="dot" data-class-off="p1_dot == 'off'"></span>
+							<span class="status-txt">{{p1_status}}</span></div>
+					</div>
+				</div>
+			</div>
+			<div class="card right">
+				<div class="card-head">
+					<span class="card-name">PLAYER 2</span>
+					<div class="seg" data-if="mode_selectable">
+						<span class="seg-opt hybrid" data-if="allow_hybrid" data-class-on="p2_mode == 0" data-event-click="set_mode_p2(0)">Hybrid<span class="seg-tip">Nudge the analog stick for smooth analog movement, or use the D-pad for classic digital control. It switches automatically based on what you touch.</span></span>
+						<span class="seg-opt" data-class-on="p2_mode == 1" data-event-click="set_mode_p2(1)">Analog</span>
+						<span class="seg-opt" data-class-on="p2_mode == 2" data-event-click="set_mode_p2(2)">D-Pad</span>
+					</div>
+				</div>
+				<div class="card-body player">
+					<div class="pad-art" data-class-analog="p2_mode != 2" data-class-digital="p2_mode == 2"></div>
+					<div class="card-col">
+						<div class="field-lbl">Device</div>
+						<div class="dropdown-wrap">
+							<div class="dropdown" data-event-click="open_dd(1)">
+								<span class="dd-label">{{p2_dev_label}}</span><span class="caret"></span>
+							</div>
+							<div class="dd-panel" data-if="dd_open == 'p2'" data-rml="p2_options"></div>
+						</div>
+						<div class="status-row"><span class="dot" data-class-off="p2_dot == 'off'"></span>
+							<span class="status-txt">{{p2_status}}</span></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="cards-row">
+			<div class="card left">
+				<div class="card-head">
+					<span class="card-name">MEMORY CARD 1</span>
+					<span class="enable-lbl">Enabled</span>
+					<span class="switch" data-class-on="mc1_enabled" data-event-click="toggle_mc1"><span class="knob"></span></span>
+				</div>
+				<div class="card-body" data-class-disabled="mc1_enabled == false">
+					<div class="mc-art"></div>
+					<div class="card-col">
+						<div class="mc-name">{{mc1_name}}</div>
+						<div class="mc-btns"><button data-event-click="browse_mc1">Browse</button><button data-event-click="new_mc1">New</button></div>
+						<div class="mc-stats">
+							<div class="mc-stat"><div class="field-lbl">Card Size</div><div class="meta-v">{{mc1_size}}</div></div>
+							<div class="mc-stat"><div class="field-lbl">Used Blocks</div><div class="meta-v">{{mc1_used}}</div></div>
+						</div>
+						<div class="blocks" data-rml="mc1_grid"></div>
+						<div class="mc-foot">{{mc1_foot}}</div>
+					</div>
+				</div>
+			</div>
+			<div class="card right">
+				<div class="card-head">
+					<span class="card-name">MEMORY CARD 2</span>
+					<span class="enable-lbl">Enabled</span>
+					<span class="switch" data-class-on="mc2_enabled" data-event-click="toggle_mc2"><span class="knob"></span></span>
+				</div>
+				<div class="card-body" data-class-disabled="mc2_enabled == false">
+					<div class="mc-art"></div>
+					<div class="card-col">
+						<div class="mc-name">{{mc2_name}}</div>
+						<div class="mc-btns"><button data-event-click="browse_mc2">Browse</button><button data-event-click="new_mc2">New</button></div>
+						<div class="mc-stats">
+							<div class="mc-stat"><div class="field-lbl">Card Size</div><div class="meta-v">{{mc2_size}}</div></div>
+							<div class="mc-stat"><div class="field-lbl">Used Blocks</div><div class="meta-v">{{mc2_used}}</div></div>
+						</div>
+						<div class="blocks" data-rml="mc2_grid"></div>
+						<div class="mc-foot">{{mc2_foot}}</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- ================= SETTINGS VIEW ================= -->
+	<div data-if="view == 'settings'">
+		<div class="settings-cols">
+		<div class="settings-col">
+		<div class="panel">
+			<div class="eyebrow">VIDEO</div>
+			<div class="set-row"><span class="set-lbl">Window size</span><span class="set-ctl">
+				<button class="toggle wide" data-event-click="cycle_winsize"><span class="value">{{winsize_label}}</span></button></span></div>
+			<div class="set-row"><span class="set-lbl">Renderer</span><span class="set-ctl">
+				<button class="toggle" data-event-click="cycle_renderer"><span class="value">{{renderer_label}}</span></button></span></div>
+			<div class="set-row" data-if="opengl_renderer"><span class="set-lbl">Frame interpolation</span><span class="set-ctl">
+				<button class="toggle" data-event-click="toggle_frame_interpolation"><span class="value" data-if="frame_interpolation">On</span><span class="value" data-if="frame_interpolation == false">Off</span></button></span></div>
+			<div class="set-row" data-if="interpolation_target_visible"><span class="set-lbl">Presentation target</span><span class="set-ctl">
+				<button class="toggle wide" data-event-click="cycle_interpolation_fps"><span class="value">{{interpolation_fps_label}}</span></button>
+				<span class="ws-hint">Gameplay remains at its original speed</span></span></div>
+			<div class="set-row"><span class="set-lbl">Supersampling</span><span class="set-ctl">
+				<button class="toggle" data-event-click="cycle_ss"><span class="value">{{supersampling}}x</span></button></span></div>
+			<div class="set-row"><span class="set-lbl">Antialiasing</span><span class="set-ctl">
+				<button class="toggle" data-event-click="toggle_aa"><span class="value" data-if="antialiasing">On</span><span class="value" data-if="antialiasing == false">Off</span></button></span></div>
+			<div class="set-row"><span class="set-lbl">Texture filtering</span><span class="set-ctl">
+				<button class="toggle" data-event-click="cycle_texfilter"><span class="value">{{texfilter_label}}</span></button></span></div>
+			<div class="set-row"><span class="set-lbl">Screen model</span><span class="set-ctl">
+				<button class="toggle" data-event-click="cycle_crt"><span class="value">{{crt_label}}</span></button></span></div>
+				<div class="set-row"><span class="set-lbl">Skip FMVs</span><span class="set-ctl">
+					<button class="toggle" data-event-click="toggle_skip_fmv"><span class="value" data-if="auto_skip_fmv">On</span><span class="value" data-if="auto_skip_fmv == false">Off</span></button></span></div>
+				<div class="set-row"><span class="set-lbl">Turbo loads</span><span class="set-ctl">
+					<button class="toggle" data-event-click="toggle_turbo_loads"><span class="value" data-if="turbo_loads">On</span><span class="value" data-if="turbo_loads == false">Off</span></button>
+					</span></div>
+				<div class="set-row"><span class="set-lbl">Fullscreen on launch</span><span class="set-ctl">
+					<button class="toggle" data-event-click="toggle_fullscreen"><span class="value" data-if="fullscreen">On</span><span class="value" data-if="fullscreen == false">Off</span></button></span></div>
+			<div class="set-row" data-if="ws_eligible"><span class="set-lbl">Widescreen <span class="exp-tag">EXPERIMENTAL</span></span><span class="set-ctl">
+				<button class="toggle" data-event-click="toggle_widescreen"><span class="value" data-if="widescreen">On</span><span class="value" data-if="widescreen == false">Off</span></button>
+				<span class="ws-hint" data-if="widescreen">16:9 native field-of-view</span></span></div>
+			<div class="setting-row" data-if="uw_eligible"><span class="setting-name">Ultrawide <span class="exp">EXPERIMENTAL</span></span><span class="setting-control">
+				<button class="toggle" data-event-click="toggle_ultrawide"><span class="value" data-if="ultrawide">On</span><span class="value" data-if="ultrawide == false">Off</span></button>
+				<span class="ws-hint" data-if="ultrawide">21:9 native field-of-view</span></span></div>
+		</div>
+		</div>
+		<div class="settings-col">
+		<div class="panel" data-if="lang_menu">
+			<div class="eyebrow">LOCALIZATION</div>
+			<div class="set-row"><span class="set-lbl">Language</span><span class="set-ctl">
+				<button class="toggle wide" data-event-click="cycle_language"><span class="value">{{lang_label}}</span></button></span></div>
+		</div>
+		<div class="panel">
+			<div class="eyebrow">AUDIO</div>
+			<div class="set-row"><span class="set-lbl">SPU high-quality (float shadow)</span><span class="set-ctl">
+				<button class="toggle" data-event-click="toggle_spu"><span class="value" data-if="spu_hq">On</span><span class="value" data-if="spu_hq == false">Off</span></button></span></div>
+		</div>
+		<div class="panel">
+			<div class="eyebrow">CONTROLLER</div>
+			<div class="set-row"><span class="set-lbl">Analog stick deadzone</span><span class="set-ctl">
+				<button class="toggle" data-event-click="cycle_deadzone"><span class="value">{{deadzone_pct}}%</span></button></span></div>
+		</div>
+		</div>
+		</div>
+		<div class="panel">
+			<div class="eyebrow">SYSTEM</div>
+			<div class="set-row"><span class="set-lbl">BIOS</span><span class="set-ctl">
+				<button data-event-click="browse_bios">Browse</button>
+				<span class="path" data-if="bios_path != ''">{{bios_path}}</span>
+				<span class="path empty" data-if="bios_path == ''">(not set)</span></span></div>
+			<div class="set-row"><span class="set-lbl">Disc</span><span class="set-ctl">
+				<button data-event-click="browse_disc">Browse</button>
+				<span class="path" data-if="disc_path != ''">{{disc_path}}</span>
+				<span class="path empty" data-if="disc_path == ''">(not set)</span></span></div>
+		</div>
+	</div>
+
+	<!-- ================= CONTROLS (KEYBOARD KEYBINDS) VIEW ================= -->
+	<div data-if="view == 'controls'">
+		<div class="panel">
+			<div class="eyebrow">KEYBOARD CONTROLS</div>
+			<div class="kb-head">
+				<span class="kb-player-lbl">Player</span>
+				<div class="seg">
+					<span class="seg-opt" data-class-on="cfg_player == 0" data-event-click="cfg_player_1">1</span>
+					<span class="seg-opt" data-class-on="cfg_player == 1" data-event-click="cfg_player_2">2</span>
+				</div>
+				<span class="kb-hint">Click a key, then press the new key to bind it. Esc cancels. Changes save instantly.</span>
+				<button class="kb-reset" data-event-click="rebind_reset">Reset to defaults</button>
+			</div>
+			<div id="rebind-list" class="rebind-list"></div>
+		</div>
+	</div>
+
+	<!-- ================= FOOTER ================= -->
+	<div class="footer">
+		<span class="switch" data-class-on="skip_launcher" data-event-click="toggle_skip_launcher"><span class="knob"></span></span>
+		<span class="skip-lbl">Skip Launcher on Boot</span>
+		<span class="foot-status"><span class="dot"></span><span class="status-txt">Recompiler ready</span></span>
+		<button id="launch" data-event-click="launch">LAUNCH GAME</button>
+	</div>
+
+	<!-- ================= SKIP-LAUNCHER CONFIRM MODAL ================= -->
+	<div class="modal-backdrop" data-if="show_skip_modal">
+		<div class="modal-box">
+			<span class="modal-title">Skip the launcher on boot?</span>
+			<span class="modal-text">The launcher will no longer appear &#8212; the game boots straight in every time. To get the launcher back, run the game with the --launcher argument, or set skip_launcher = false in settings.toml.</span>
+			<div class="modal-btns">
+				<span class="modal-spacer"></span>
+				<button data-event-click="skip_modal_cancel">Cancel</button>
+				<button class="modal-confirm" data-event-click="skip_modal_confirm">Skip on Boot</button>
+			</div>
+		</div>
+	</div>
+
+</div>
+</body>
+</rml>
