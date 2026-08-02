@@ -5,6 +5,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp")
 set(PSX_RECOMP_UI ON CACHE BOOL "" FORCE)
 set(PSX_LAUNCHER OFF CACHE BOOL "" FORCE)
+if(PSX_RECOMP_UI)
+    set(RECOMP_UI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/recomp-ui" CACHE PATH
+        "Root directory of the recomp-ui launcher repo" FORCE)
+    if(NOT EXISTS "${RECOMP_UI_ROOT}/recomp_ui.cmake")
+        message(FATAL_ERROR
+            "PSX_RECOMP_UI=ON requires the recomp-ui submodule at ${RECOMP_UI_ROOT}. "
+            "Initialize it with `git submodule update --init --recursive` and re-run CMake.")
+    endif()
+endif()
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 file(GLOB GAME_FULL CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/generated/*_full.c"
@@ -31,13 +40,6 @@ if(PSX_RECOMP_UI)
     if(NOT DEFINED RECOMP_UI_ENABLE_MODS)
         set(RECOMP_UI_ENABLE_MODS ON CACHE BOOL
             "Enable this game's Mods launcher view" FORCE)
-    endif()
-    set(RECOMP_UI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/recomp-ui" CACHE PATH
-        "Root directory of the recomp-ui launcher repo" FORCE)
-    if(NOT EXISTS "${RECOMP_UI_ROOT}/recomp_ui.cmake")
-        message(FATAL_ERROR
-            "PSX_RECOMP_UI=ON requires the recomp-ui submodule at ${RECOMP_UI_ROOT}. "
-            "Initialize it with `git submodule update --init --recursive` and re-run CMake.")
     endif()
     include("${RECOMP_UI_ROOT}/recomp_ui.cmake")
     recomp_target_launcher_ui(psx-runtime CONSOLE psx)
