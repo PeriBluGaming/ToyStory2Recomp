@@ -19,4 +19,4 @@ bios_hle = true
 overlay_cache = true
 
 [video]
-renderer = "opengl"
+renderer = "software"

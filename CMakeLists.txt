@@ -4,6 +4,8 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp")
 set(PSX_RECOMP_UI ON CACHE BOOL "" FORCE)
+# Keep the legacy RmlUi launcher disabled in this repo; recomp-ui is integrated
+# separately and does not require psxrecomp/lib/RmlUi or psxrecomp/lib/freetype.
 set(PSX_LAUNCHER OFF CACHE BOOL "" FORCE)
 if(PSX_RECOMP_UI)
     set(RECOMP_UI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/recomp-ui" CACHE PATH
