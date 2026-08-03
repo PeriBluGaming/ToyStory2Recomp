@@ -1,0 +1,16 @@
+{
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#053610",
+        "titleBar.activeBackground": "#13D03F",
+        "titleBar.activeForeground": "#031F09",
+        "titleBar.inactiveBackground": "#053610",
+        "titleBar.inactiveForeground": "#031F09",
+        "statusBar.background": "#074816",
+        "statusBar.foreground": "#EFFDF3",
+        "statusBar.debuggingBackground": "#074816",
+        "statusBar.debuggingForeground": "#EFFDF3",
+        "statusBar.noFolderBackground": "#074816",
+        "statusBar.noFolderForeground": "#EFFDF3"
+    },
+    "snyk.advanced.autoSelectOrganization": true
+}
