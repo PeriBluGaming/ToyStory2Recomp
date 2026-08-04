@@ -4,6 +4,7 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp")
 set(PSX_LAUNCHER OFF CACHE BOOL "" FORCE)
+set(PSX_RECOMP_UI ON CACHE BOOL "" FORCE)
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 file(GLOB GAME_FULL CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/generated/*_full.c"
@@ -17,3 +18,10 @@ psxrecomp_add_runtime_target(psx-runtime
   WINDOW_TITLE "SLUS-00893 Recompiled"
   DEFAULT_GAME_CONFIG_PATH "game.toml"
 )
+
+include(${CMAKE_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
+recomp_target_launcher_ui(psx-runtime
+    CONSOLE psx
+    BOXART ${CMAKE_SOURCE_DIR}/art/boxart.tga
+    PAD    ${CMAKE_SOURCE_DIR}/art/pad.tga
+    BRAND  ${CMAKE_SOURCE_DIR}/art/brand.tga)
