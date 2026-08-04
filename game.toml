@@ -2,7 +2,7 @@
 name = "ToyStory2Recomp"
 id = "SLUS-00893"
 exe = "input/SLUS_008.93"
-disc = "c:/Users/Dominik/Documents/toystory/Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue"
+disc = "disc/Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue"
 load_address = "0x80010000"
 entry_pc = "0x80082D60"
 text_size = "0x92000"
