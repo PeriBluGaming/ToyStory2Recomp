@@ -3990,6 +3990,8 @@ int main(int argc, char** argv) {
             seed.window_width = g_video_win_w; seed.has_window_width = true;
 
 #if defined(RECOMP_LAUNCHER)
+            #include "recomp_launcher.h"
+            #include "launcher_profile.h"
             /* ---- recomp-ui (Dear ImGui) launcher path — PROTOTYPE ----------
              * Runs the shared, console-agnostic recomp-ui launcher (see
              * F:\Projects\recomp-ui) INSTEAD OF the RmlUi launcher above. Unlike
@@ -4004,7 +4006,14 @@ int main(int argc, char** argv) {
             std::string rui_title = (game_name.empty() ? std::string("PSX") : game_name)
                                      + " \xE2\x80\x94 Launcher";
 
+            // NEW
             RecompLauncherCSettings ls{};
+            RecompLauncherCGameInfo gi = {0};
+            launcher_profile_apply("psx", &gi);
+            char out_rom[512];
+            int rc = recomp_launcher_run_window("My Game — Launcher", &io, &gi,
+                                    ".", initial_rom, out_rom, sizeof(out_rom));
+
             ls.output_method  = 2;  /* OpenGL */
             ls.window_scale   = std::max(1, std::min(4, g_video_win_w / 320));
             ls.fullscreen     = seed.fullscreen ? 1 : 0;
