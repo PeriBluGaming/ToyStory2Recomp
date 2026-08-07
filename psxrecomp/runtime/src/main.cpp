@@ -54,7 +54,7 @@ extern "C" void psx_event_step_conservative_env_init(void);
 #include "disc_identity.h"
 #include "iso_reader.h"      /* text-image guard: extract the boot EXE from the disc */
 #include "psx_keybinds.h"    /* configurable keyboard->DualShock keybinds (keybinds.ini) */
-#if defined(PSX_LAUNCHER)
+#if defined(PSX_LAUNCHER) // HIER || defined(RECOMP_LAUNCHER)
 #include "launcher.h"
 #endif
 #if defined(RECOMP_LAUNCHER)
@@ -3938,7 +3938,7 @@ int main(int argc, char** argv) {
         }
     }
 
-#if defined(PSX_LAUNCHER)
+#if defined(PSX_LAUNCHER) || defined(RECOMP_LAUNCHER)
     /* Integrated launcher: shown in its own GL window before the emulator
      * boots. Seeded with the effective settings (game.toml ∪ settings.toml);
      * on LAUNCH the user's choices are persisted to settings.toml and applied.
@@ -3989,7 +3989,11 @@ int main(int argc, char** argv) {
             seed.has_deadzone = true;
             seed.window_width = g_video_win_w; seed.has_window_width = true;
 
+            int launcher_result = -1; /* 0=launch, 1=quit, -1=unavailable */
+
 #if defined(RECOMP_LAUNCHER)
+            #include "recomp_launcher.h"
+            #include "launcher_profile.h"
             /* ---- recomp-ui (Dear ImGui) launcher path — PROTOTYPE ----------
              * Runs the shared, console-agnostic recomp-ui launcher (see
              * F:\Projects\recomp-ui) INSTEAD OF the RmlUi launcher above. Unlike
@@ -4141,12 +4145,9 @@ int main(int argc, char** argv) {
                 rui_title.c_str(), &ls, &gi, assets_dir_str.c_str(),
                 rui_initial_disc.c_str(), rui_out_disc, sizeof(rui_out_disc));
 
-            psx_launcher::Result lr =
-                (rui_rc == 0) ? psx_launcher::Result::Launch :
-                (rui_rc == 1) ? psx_launcher::Result::Quit :
-                                 psx_launcher::Result::Unavailable;
+            launcher_result = (rui_rc == 0) ? 0 : (rui_rc == 1) ? 1 : -1;
 
-            if (lr == psx_launcher::Result::Launch) {
+            if (launcher_result == 0) {
                 if (rui_out_disc[0]) {
                     seed.disc_path = rui_out_disc;
                     seed.has_disc_path = true;
@@ -4246,15 +4247,18 @@ int main(int argc, char** argv) {
                 }
                 SDL_DestroyWindow(lwin);
             }
+            launcher_result =
+                (lr == psx_launcher::Result::Launch) ? 0 :
+                (lr == psx_launcher::Result::Quit) ? 1 : -1;
             /* Reset GL attributes so the emulator window starts from defaults. */
             SDL_GL_ResetAttributes();
 #endif
 
-            if (lr == psx_launcher::Result::Quit) {
+            if (launcher_result == 1) {
                 std::fprintf(stdout, "psxrecomp: launcher closed; exiting.\n");
                 return 0;
             }
-            if (lr == psx_launcher::Result::Launch) {
+            if (launcher_result == 0) {
                 g_video_renderer  = seed.renderer;
                 g_video_scale     = seed.supersampling;
                 g_video_aa        = seed.antialiasing;
