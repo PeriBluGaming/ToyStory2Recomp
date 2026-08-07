@@ -7,6 +7,8 @@
 Toy Story 2: Buzz Lightyear to the Rescue (USA, SLUS-00893) statically recompiled to a native PC executable with
 [PSXRecomp](https://github.com/mstan/psxrecomp).
 
+![ToyStory2Recomp](/docs/ToyStory2Recomp.png)
+
 ## What This Is
 
 This repository contains the game-specific configuration, seeds, tools, and
