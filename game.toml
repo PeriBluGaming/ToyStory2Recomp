@@ -17,6 +17,7 @@ out_dir = "generated"
 window_title = "ToyStory2Recomp"
 bios_hle = true
 overlay_cache = true
+skip_launcher = false
 
 [video]
 renderer = "opengl"
