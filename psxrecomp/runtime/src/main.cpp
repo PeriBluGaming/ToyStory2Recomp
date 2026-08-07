@@ -4091,7 +4091,7 @@ int main(int argc, char** argv) {
             rui_lang_labels.reserve(lang_menu_options.size());
             for (const auto& lo : lang_menu_options) rui_lang_labels.push_back(lo.label.c_str());
 
-            RecompLauncherCGameInfo gi{};
+            RecompLauncherCGameInfo gi{0};
             /* System identity + full PS1 settings-surface capability set (theme,
              * platform label, rom_noun, pad-mode support, aspect mask base, and
              * all has_* deep-settings flags) — one profile call keeps them from
