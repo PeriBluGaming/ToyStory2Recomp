@@ -1,0 +1,13 @@
+{
+  "$schema": "https://recomp.fyi/schema/v1.json",
+  "game": "ToyStory2",
+  "system": "PS1",
+  "type": "recomp",
+  "toolchain": "psxrecomp",
+  "status": "exploring",
+  "project": "ToyStory2Recomp",
+  "original": {
+    "region": "USA",
+    "serial": "SLUS-00893"
+  }
+}

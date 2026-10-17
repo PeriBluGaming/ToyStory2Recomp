@@ -1,23 +1,54 @@
+# Autofilled by tools/new_project_layout/probe_disc.py from your legal dump.
+# Review before shipping. Runtime quirks / overlay seeds still need hand work.
+
 [game]
-name = "ToyStory2Recomp"
+name = "ToyStory2"
 id = "SLUS-00893"
-exe = "input/SLUS_008.93"
-disc = "c:/Users/Dominik/Documents/recomp/discs/ToyStory2/Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue"
+players = 1
+exe = "disc/SLUS_008.93"
+disc = "/Users/dominikblunck/Documents/Entwicklung/recomp/game/Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue"
 load_address = "0x80010000"
 entry_pc = "0x80082D60"
-text_size = "0x92000"
+text_size = "0x00091800"
 stack_base = "0x801FFFF0"
 
+# Digests are for data Track 01 (first BINARY FILE / TRACK 01).
+[prepare_disc]
+out_dir = "disc"
+bin_name = "Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).bin"
+cue_name = "Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue"
+boot_exe = "SLUS_008.93"
+known_sizes = [633125472]
+known_md5 = [
+  "a3f77918dc0fb2227e976a2ec75921e2",
+]
+known_sha1 = [
+  "ef20f5fcae59c80dd1d0d1bfc51ba51d8c64e967",
+]
+known_crc32 = [
+  "5942db1f",
+]
+
 [recompiler]
-seeds = "seeds/functions.txt"
-strict = true
+seeds = "seeds/ghidra_funcs.txt"
 out_dir = "generated"
+strict = true
 
 [runtime]
-window_title = "ToyStory2Recomp"
-bios_hle = true
+window_title = "ToyStory2 Recompiled"
+memcard_dir = "saves"
 overlay_cache = true
-skip_launcher = false
 
 [video]
 renderer = "opengl"
+aspect_ratio = "4:3"
+
+[controller]
+default_mode = "digital"
+
+# Online mount gate: digests + track count + optional TOC fingerprint
+# (see docs/NETPLAY.md).
+[netplay]
+require_cue = true
+required_tracks = 1
+required_disc_fp = "3ca567e4ce281b59072c044ddde5bdef8a0033cad03bb7641cb4a633fdcb4821"

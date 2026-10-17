@@ -1,31 +1,67 @@
 cmake_minimum_required(VERSION 3.20)
-project(SLUS_00893Recomp C CXX)
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 17)
-set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp")
-set(PSX_LAUNCHER OFF CACHE BOOL "" FORCE)
+set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp" CACHE PATH
+    "Path to psxrecomp")
+if(NOT EXISTS "${PSXRECOMP_ROOT}/runtime/runtime.cmake")
+    message(FATAL_ERROR
+        "PSXRecomp runtime is missing: ${PSXRECOMP_ROOT}/runtime/runtime.cmake\n"
+        "This project expects the psxrecomp framework checkout at ${PSXRECOMP_ROOT}.\n"
+        "Run: git submodule update --init --recursive\n"
+        "If psxrecomp/ is not a submodule, set -DPSXRECOMP_ROOT=<path-to-psxrecomp>.")
+endif()
 
-# recomp-ui
-set(PSX_RECOMP_UI ON CACHE BOOL "" FORCE)
+project(ToyStory2Recomp LANGUAGES C CXX)
+
+# --- Opt-in product surfaces (OFF by default in the framework) -------------
+# Scaffold prompts / flags fill these. Without recomp-ui, PSX_RECOMP_UI is OFF.
+# The wizard (WIZARD_CMAKE_BLOCK / ENABLE_SETUP_WIZARD) is the first-run disc
+# picker; releases are compiled from the committed generated/ C, so it never
+# needs to generate or rebuild anything on a player's machine.
+# recomp-ui submodule present (PSX_RECOMP_UI defaults ON).
+# Full netplay UI — enable after adding recomp-ui + testing:
+# if(EXISTS "${PSXRECOMP_ROOT}/lib/recomp-net/CMakeLists.txt")
+#     set(PSX_NETPLAY ON CACHE BOOL "…" FORCE)
+# endif()
+set(PSX_SETUP_WIZARD ON CACHE BOOL
+    "Advertise first-run setup wizard + Generate & rebuild in recomp-ui" FORCE)
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
-file(GLOB GAME_FULL CONFIGURE_DEPENDS
-  "${CMAKE_CURRENT_SOURCE_DIR}/generated/*_full.c"
-  "${CMAKE_CURRENT_SOURCE_DIR}/generated/*_full_*.c")
-file(GLOB GAME_DISPATCH "${CMAKE_CURRENT_SOURCE_DIR}/generated/*_dispatch.c")
-psxrecomp_add_runtime_target(psx-runtime
-  GAME_GENERATED_FULL_C "${GAME_FULL}"
-  GAME_GENERATED_DISPATCH_C "${GAME_DISPATCH}"
-  BIOS_GENERATED_FULL_C "${CMAKE_CURRENT_SOURCE_DIR}/bios-generated/SCPH1001_full.c"
-  BIOS_GENERATED_DISPATCH_C "${CMAKE_CURRENT_SOURCE_DIR}/bios-generated/SCPH1001_dispatch.c"
-  WINDOW_TITLE "SLUS-00893 Recompiled"
-  DEFAULT_GAME_CONFIG_PATH "game.toml"
+
+# This project's own mod catalog. The FRAMEWORK stages it -- together with its
+# builtin psx.* packages -- into <exe-dir>/mods/bundled, and refuses to
+# configure if a catalog exists here but is not declared. Never copy it by
+# hand: five titles did, and framework 4cc04be3's rename of the staged
+# directory broke all five silently (bead beads-eio.3.101).
+set(PSX_PRELOADED_MODS "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded")
+if(NOT IS_DIRECTORY "${PSX_PRELOADED_MODS}")
+    set(PSX_PRELOADED_MODS "NONE")
+endif()
+
+psxrecomp_add_game_runtime(psx-runtime
+    PRELOADED_MODS_DIR "${PSX_PRELOADED_MODS}"
+    # ENABLE_NETPLAY_IF_PRESENT
+    # NETPLAY_LOBBY_URL "ws://netplay.retcomm.net:8765"
+    ENABLE_SETUP_WIZARD
+    WINDOW_TITLE "ToyStory2 Recompiled"
+    DEFAULT_GAME_CONFIG_PATH "game.toml"
+    MAX_PLAYERS 1
+    # LAUNCHER_BOXART "${CMAKE_CURRENT_SOURCE_DIR}/launcher_assets/img/boxart.tga"
+    APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/psxrecomp.ico"
+    # Committed game C (psxrecomp_cli.py generate; git add generated). Release
+    # CI configures with -DPSXRECOMP_REQUIRE_GAME_C=ON so a checkout without
+    # it fails instead of building a setup host.
+    GEN_MARKER "generated/SLUS_008.93_dispatch.c"
+    GEN_FULL_GLOB "generated/SLUS_008.93_full_*.c"
+    CODEGEN_SETUP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
 )
 
-# recomp-ui
-add_compile_definitions(RECOMP_LAUNCHER)
-include(${CMAKE_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
-recomp_target_launcher_ui(psx-runtime
-    CONSOLE psx                                  # required: psx/snes/nds/n64/nes/...
-    BOXART ${CMAKE_SOURCE_DIR}/art/boxart.tga   # optional: game box art
-    PAD    ${CMAKE_SOURCE_DIR}/art/pad.tga       # optional: per-console controller image
-    BRAND  ${CMAKE_SOURCE_DIR}/art/brand.tga)    # optional: per-console top-left mark
+# Stage runtime configs next to the exe for direct build/ launches. Only copy
+# files that exist — never fail POST_BUILD when game_options.toml is absent.
+foreach(_PSX_RUNTIME_CONFIG game.toml game_options.toml)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_PSX_RUNTIME_CONFIG}")
+        add_custom_command(TARGET psx-runtime POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/${_PSX_RUNTIME_CONFIG}"
+                "$<TARGET_FILE_DIR:psx-runtime>/${_PSX_RUNTIME_CONFIG}"
+            COMMENT "Staging ${_PSX_RUNTIME_CONFIG}"
+            VERBATIM)
+    endif()
+endforeach()
