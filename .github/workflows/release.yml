@@ -222,6 +222,15 @@ jobs:
         shell: bash
         run: bash psxrecomp/tools/ci/check_generated.sh --root .
 
+      # Bugfix for Bios stamps
+      - name: Refresh OpenBIOS fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd psxrecomp
+          bash tools/bios_emitter_fingerprint.sh bios/OpenBIOS.toml \
+            > generated/OpenBIOS.emitter.sha
+      
       # The framework's committed BIOS backends must carry stamps that match
       # the emitter fingerprint computed HERE. runtime.cmake re-checks this at
       # configure (BIOS_STALE_FATAL); this step runs first and, on mismatch,
