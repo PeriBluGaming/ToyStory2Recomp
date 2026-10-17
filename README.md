@@ -17,8 +17,8 @@ Toy Story 2: Buzz Lightyear to the Rescue (USA, SLUS-00893) statically recompile
 |---|---|
 | Players | 1 |
 | Region | USA |
-| Publisher | — |
-| Year | — |
+| Publisher | Activision, Traveller's Tales |
+| Year | 1999 |
 
 Scaffolded with the New Project Layout. See
 `psxrecomp/docs/GAME_PROJECT_SETUP.md` for the full flow.
