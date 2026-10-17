@@ -10,7 +10,8 @@ Static recompilation of **ToyStory2** built on
 [psxrecomp](https://github.com/mstan/psxrecomp) and
 [recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui).
 
-_Add a short pitch in catalog_identity.json / README._
+Toy Story 2: Buzz Lightyear to the Rescue (USA, SLUS-00893) statically recompiled to a native PC executable with PSXRecomp.
+![ToyStory2Recomp](/docs/ToyStory2Recomp.png)
 
 | | |
 |---|---|
