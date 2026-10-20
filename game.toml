@@ -33,6 +33,8 @@ known_crc32 = [
 seeds = "seeds/ghidra_funcs.txt"
 out_dir = "generated"
 strict = true
+# Skip-Intro-Mod main()'s intro runner (0x8007BC74).
+mod_function_entry_funcs = ["0x8007BC74"]
 
 [runtime]
 window_title = "ToyStory2 Recompiled"
