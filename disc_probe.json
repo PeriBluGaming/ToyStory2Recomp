@@ -1,5 +1,5 @@
 {
-  "cue_path": "/Users/dominikblunck/Documents/Entwicklung/recomp/game/Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue",
+  "cue_path": "Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue",
   "cue_name": "Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue",
   "bin_name": "Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).bin",
   "track_count": 1,
@@ -21,7 +21,7 @@
   "boot_exe_sha256": "32c6752984f27681b4da557374e7bf6cf2a51ecb800aaefd2eb1fbfa11cb9343",
   "seed_count": 657,
   "warnings": [
-    "cue has only 1 TRACK \u2014 Track-01-only dumps fail multi-track netplay/catalog gates; prefer a full Redump cue."
+    "cue has only 1 TRACK — Track-01-only dumps fail multi-track netplay/catalog gates; prefer a full Redump cue."
   ],
   "notes": [
     "entry_pc/load_address/text_size/stack_base taken from PS-X EXE header.",
