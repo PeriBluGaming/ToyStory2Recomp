@@ -222,6 +222,14 @@ jobs:
         shell: bash
         run: bash psxrecomp/tools/ci/check_generated.sh --root .
 
+      # The pinned psxrecomp (7cddab82) lacks screen_x_sites support in the
+      # dirty-RAM interpreter. Apply our versioned patch to the submodule
+      # working tree (idempotent; fails loudly on a pin/patch mismatch). This
+      # MUST precede the fingerprint refresh and every build step.
+      - name: Apply psxrecomp patch
+        shell: bash
+        run: bash tools/apply_psxrecomp_patch.sh
+
       # Bugfix for Bios stamps
       - name: Refresh OpenBIOS fingerprint
         shell: bash
@@ -614,6 +622,13 @@ jobs:
           echo "mod manifests in zip: ${MANIFESTS}"
           if [[ "${MANIFESTS}" -lt 1 ]]; then
             echo "::error::release zip ships no mod catalog (mods/bundled/*/manifest.toml)" >&2
+            exit 1
+          fi
+          # 1b. The OpenBIOS free() compatibility mod is mandatory: without it
+          #     the game hangs after the Andy's House movie on OpenBIOS.
+          BIOS_FREE_MANIFEST='mods/bundled/toystory2.enhancement.bios-free-compat/1.0.0/manifest.toml'
+          if ! grep -qxF "${BIOS_FREE_MANIFEST}" <<<"${LIST}"; then
+            echo "::error::release zip lacks ${BIOS_FREE_MANIFEST} (OpenBIOS free() compatibility mod)" >&2
             exit 1
           fi
           # 2. It is NOT a build kit: no framework tree, no CLI, no emitters at
