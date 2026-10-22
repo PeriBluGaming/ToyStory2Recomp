@@ -6,7 +6,6 @@ name = "ToyStory2"
 id = "SLUS-00893"
 players = 1
 exe = "disc/SLUS_008.93"
-disc = "/Users/dominikblunck/Documents/Entwicklung/recomp/game/Disney-Pixar Toy Story 2 - Buzz Lightyear to the Rescue! (USA).cue"
 load_address = "0x80010000"
 entry_pc = "0x80082D60"
 text_size = "0x00091800"
@@ -33,22 +32,65 @@ known_crc32 = [
 seeds = "seeds/ghidra_funcs.txt"
 out_dir = "generated"
 strict = true
+# 0x8007BC74: Skip Startup Intro mod (main()'s intro runner).
+# 0x80010000: widescreen mod (SetClipRect, widens the full-screen X clip).
+# 0x80084FCC: widescreen mod (AddPrim, anchors HUD packets to the wide edges).
+# 0x80082E8C: BIOS free() compatibility mod (retail free() side effect, OpenBIOS hang).
+mod_function_entry_funcs = ["0x8007BC74", "0x80010000", "0x80084FCC", "0x80082E8C"]
 
 [runtime]
 window_title = "ToyStory2 Recompiled"
 memcard_dir = "saves"
 overlay_cache = true
+hide_hidden_mod_features = true
 
 [video]
 renderer = "opengl"
-aspect_ratio = "4:3"
+aspect_ratio = "4:3"   # widescreen is mod-owned; the widescreen feature sets 16:9
+auto_skip_fmv = false
+offer_skip_fmv = true
+
+[widescreen]
+gte_game_mode = true
+auto_ui_anchor     = "edges"
+clear_reveal       = true
+offer_ultrawide    = true
+adaptive_view      = true
+
+[widescreen.cull]
+auto_screen_x = true
+
+screen_w_imms = ["0x100", "0x101", "0x200", "0x201"]
+screen_h_imms = ["0xF0", "0xF1"]
+
+screen_x_sites = [
+    "0x80014F84",
+    "0x8001688C",
+    "0x8001A71C",
+    "0x8001BAA8",
+    "0x8001FF78",
+    "0x8001FF84",
+    "0x8001FF90",
+    "0x8001FF9C",
+    "0x80015B68",
+    "0x80015B60",
+    "0x80015BE8",
+    "0x80015BF4",
+    "0x80015C00",
+    "0x80015C0C",
+    "0x80015C18",
+    "0x80015C24",
+    "0x80015C30",
+    "0x80015C3C"
+]
 
 [controller]
 default_mode = "digital"
+multitap_analog = true
 
+[netplay]
 # Online mount gate: digests + track count + optional TOC fingerprint
 # (see docs/NETPLAY.md).
-[netplay]
 require_cue = true
 required_tracks = 1
 required_disc_fp = "3ca567e4ce281b59072c044ddde5bdef8a0033cad03bb7641cb4a633fdcb4821"

@@ -1,0 +1,23 @@
+format_version = 5
+id = "toystory2.enhancement.bios-free-compat"
+version = "1.0.0"
+name = "BIOS free() Compatibility"
+author = "PeriBluGaming"
+description = "Reproduces the retail BIOS free() behaviour for the pointer Toy Story 2 frees after the Andy's House FMV, so the open-source BIOS no longer hangs there. Always on; runs on any BIOS."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00893"
+
+[[feature]]
+id = "bios-free-compat"
+name = "BIOS free() Compatibility"
+description = "Compatibility workaround for the Andy's House FMV hang with OpenBIOS."
+group = "Gameplay"
+default_enabled = true
+hidden = true
+
+[[plugin]]
+feature = "bios-free-compat"
+id = "toystory2.bios-free-compat"
