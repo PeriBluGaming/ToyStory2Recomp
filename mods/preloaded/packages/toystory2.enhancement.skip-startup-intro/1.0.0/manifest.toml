@@ -3,7 +3,7 @@ id = "toystory2.enhancement.skip-startup-intro"
 version = "1.0.0"
 name = "Skip Startup Intro"
 author = "PeriBluGaming"
-description = "Skips the legal screens, ESRB screen and startup movies and goes straight to the Press Start title screen."
+description = "Skips the legal screens, ESRB screen and startup movies, taking you directly to the original Press Start title screen. For potentially faster loading, you can also enable the separate CD Speed Boost enhancement."
 resolver = "declarative"
 save_compatibility = "shared"
 
@@ -13,7 +13,7 @@ game_id = "SLUS-00893"
 [[feature]]
 id = "skip-startup-intro"
 name = "Skip Startup Intro"
-description = "Skips the pre-title logos and intro movies. The Press Start title screen still appears."
+description = "Skips the pre-title logos and intro movies while preserving the original Press Start screen. Tip: Enable CD Speed Boost separately for potentially shorter loading times. It is optional."
 group = "Gameplay"
 default_enabled = false
 
