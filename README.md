@@ -156,18 +156,24 @@ untested. The generated BIOS code is a local cache; never redistribute it.
 
 ## Building from source
 
-The pinned `psxrecomp` submodule (`7cddab82`) is used with **one versioned
-patch**, `patches/psxrecomp-screen-x-interp.patch`, which makes the dirty-RAM
-interpreter honour `[widescreen.cull] screen_x_sites`. Apply it after checkout
-and before configuring:
+The pinned `psxrecomp` submodule (`7cddab82`) is used with **two versioned
+patches**, applied in order:
+
+1. `patches/psxrecomp-screen-x-interp.patch` makes the dirty-RAM interpreter
+   honour `[widescreen.cull] screen_x_sites`.
+2. `patches/psxrecomp-windows-toolchain.patch` makes Windows runtime overlay/BIOS
+   compilation require a native (non-Cygwin/MSYS) compiler and rejects
+   incompatible cached DLLs before they are loaded.
+
+Apply them after checkout and before configuring:
 
 ```bash
 git submodule update --init --recursive
-bash tools/apply_psxrecomp_patch.sh   # idempotent; verifies the pin and the patch
+bash tools/apply_psxrecomp_patch.sh   # idempotent; verifies the pin and the patches
 ```
 
 CI does this automatically. Do not bump `psxrecomp` without regenerating the
-patch (the script refuses to run on a different base commit).
+patches (the script refuses to run on a different base commit).
 
 ## Quick start (dev)
 

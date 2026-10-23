@@ -64,7 +64,7 @@ on:
         description: 'Create git tag vX.Y.Z and GitHub Release'
         required: true
         type: boolean
-        default: true
+        default: false
       reuse_cached_emitters:
         description: 'Skip emitter rebuild when build-recompiler cache hits (psxrecomp SHA)'
         required: false
