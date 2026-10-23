@@ -103,15 +103,21 @@ distributed.
 > pass-through calls, and only the four previously identified return
 > addresses; every write set only bit 0 of the preceding word. This is
 > targeted manual coverage, not full-game or cross-platform validation.
-> Windows, Linux and macOS arm64 remain untested.
+>
+> **Platform test status (v0.4.0):** the game has been runtime-tested on
+> Windows x64, Linux (Steam Deck) and macOS Intel. macOS ARM64 is built by CI
+> but has **not been runtime-tested**. The detailed OpenBIOS coverage above was
+> performed on macOS x64 only.
 
 ### Using a retail SCPH-1001 (workaround)
 
 Release zips bundle a toolchain that builds a BIOS backend from **your own**
 SCPH-1001 dump (CRC32 `37157331`, 512 KiB, v2.2) on first use. Tested with
-the macOS x64 package only; other platforms are untested. A C compiler must
-be available on `PATH` on macOS and Linux (Xcode Command Line Tools, or
-`gcc`/`clang`); Windows is untested.
+the macOS x64 package only; other platforms are untested for this workaround.
+A C compiler must be available on `PATH` on macOS and Linux (Xcode Command
+Line Tools, or `gcc`/`clang`); on Windows the bundled toolchain selects a
+native MinGW-w64 GCC and rejects Cygwin/MSYS compilers, but preparing a
+retail BIOS backend on Windows has not been tested.
 
 1. Unzip the release and run `ToyStory2_Recompiled`.
 2. In the launcher, select your disc image, then open the **BIOS** setting
@@ -133,6 +139,7 @@ untested. The generated BIOS code is a local cache; never redistribute it.
 
 - OpenBIOS compatibility was manually verified across multiple levels on
   macOS x64 (see above); not every level or platform has been tested.
+- macOS ARM64 is CI-built only and has not been runtime-tested.
 - Native widescreen is verified in Andy's House and the Level Select screen;
   other levels have not been fully tested and may show culling gaps or
   misplaced HUD elements at the screen edges.
