@@ -1,0 +1,186 @@
+diff --git a/runtime/include/gpu.h b/runtime/include/gpu.h
+index 4ce9c929..e246a0bc 100644
+--- a/runtime/include/gpu.h
++++ b/runtime/include/gpu.h
+@@ -445,6 +445,8 @@ uint32_t psx_ws_clip_edge_x(uint32_t v, uint32_t w);
+  * 4:3. */
+ uint32_t psx_ws_cull_lui_hi(uint32_t imm);
+ int  psx_ws_cull_bltz_hi(uint32_t v);
++void gpu_ws_set_cull_screen_x_sites(const uint32_t *sites, int nsites);
++int  psx_ws_is_cull_screen_x_site(uint32_t pc);
+ int  psx_ws_cull_vxrange(uint32_t x, uint32_t imm);
+ /* True if a run of instruction words carries the screen-extent reject signature
+  * (a width compare AND a height compare from the configured immediate sets).
+diff --git a/runtime/src/dirty_ram_interp.c b/runtime/src/dirty_ram_interp.c
+index 346bd612..f6d9773d 100644
+--- a/runtime/src/dirty_ram_interp.c
++++ b/runtime/src/dirty_ram_interp.c
+@@ -2088,8 +2088,11 @@ static int exec_one_fetched_inner(CPUState *cpu, uint32_t pc, uint32_t insn,
+             /* Widescreen render-funnel LEFT-edge widen (auto_screen_x): a
+              * classified funnel bltz rejects only past the revealed margin.
+              * Identity at 4:3 (margin 0). Gated per-game, cheap cached scan. */
+-            if (psx_ws_is_cull_bltz_site(pc) ||
+-                (psx_ws_auto_cull_on() && ws_cull_bltz_site(pc)))
++            if (psx_ws_is_cull_bltz_site(pc))
++                taken = psx_ws_cull_bltz(cpu->gpr[rs]);
++            else if (psx_ws_is_cull_screen_x_site(pc))
++                taken = psx_ws_cull_bltz_hi(cpu->gpr[rs]);
++            else if (psx_ws_auto_cull_on() && ws_cull_bltz_site(pc))
+                 taken = psx_ws_cull_bltz(cpu->gpr[rs]);
+             else
+                 taken = ((int32_t)cpu->gpr[rs] <  0);
+@@ -2196,6 +2199,8 @@ static int exec_one_fetched_inner(CPUState *cpu, uint32_t pc, uint32_t insn,
+                             ((uint32_t)simm + 2u *
+                              (uint32_t)psx_ws_activation_margin())) ? 1u : 0u;
+         }
++        else if (psx_ws_is_cull_screen_x_site(pc))
++            cpu->gpr[rt] = (uint32_t)psx_ws_cull_sltiu(cpu->gpr[rs], imm);
+         else if (psx_ws_auto_cull_on() && psx_ws_is_cull_w_imm(imm) && ws_cull_site(pc))
+             cpu->gpr[rt] = (uint32_t)psx_ws_cull_sltiu(cpu->gpr[rs], imm);
+         else
+@@ -2231,6 +2236,8 @@ static int exec_one_fetched_inner(CPUState *cpu, uint32_t pc, uint32_t insn,
+     case 0x0F: /* LUI rt, imm */
+         if (psx_ws_is_signed_x_bound_site(pc, insn))
+             cpu->gpr[rt] = (uint32_t)psx_ws_player_x_bound((int32_t)(imm << 16));
++        else if (psx_ws_is_cull_screen_x_site(pc))
++            cpu->gpr[rt] = psx_ws_cull_lui_hi(imm);
+         else
+             cpu->gpr[rt] = imm << 16;
+         psx_pgxp_alu(cpu, insn, cpu->gpr[rt], 0, 0);
+diff --git a/runtime/src/gpu.c b/runtime/src/gpu.c
+index 17890e93..7ec6a312 100644
+--- a/runtime/src/gpu.c
++++ b/runtime/src/gpu.c
+@@ -782,8 +782,21 @@ WS_EXPLICIT_LIST(bltz);
+ WS_EXPLICIT_LIST(bgez);
+ WS_EXPLICIT_LIST(branch_keep);
+ WS_EXPLICIT_LIST(clip_edge_x_load);
++WS_EXPLICIT_LIST(screen_x);
+ static uint32_t ws_clip_edge_width = 320;
+ 
++/* [widescreen.cull] screen_x_sites for interpreted code: native code compiles
++ * the list in (code_generator.cpp); this keeps a dirty-RAM copy of a listed
++ * site on the same semantics. */
++void gpu_ws_set_cull_screen_x_sites(const uint32_t *sites, int nsites) {
++    ws_explicit_screen_x_n = ws_explicit_store(
++        ws_explicit_screen_x_sites, sites, nsites, "screen_x_sites");
++}
++int psx_ws_is_cull_screen_x_site(uint32_t pc) {
++    return ws_explicit_site(ws_explicit_screen_x_sites,
++                            ws_explicit_screen_x_n, pc);
++}
++
+ void gpu_ws_set_explicit_cull_sites(const uint32_t *bias, int nbias,
+                                     const uint32_t *slti, int nslti,
+                                     const uint32_t *range, int nrange) {
+diff --git a/runtime/src/main.cpp b/runtime/src/main.cpp
+index 00f1faf3..e825561e 100644
+--- a/runtime/src/main.cpp
++++ b/runtime/src/main.cpp
+@@ -17824,6 +17824,9 @@ int main(int argc, char** argv) {
+              * must never have its live code scanned and rewritten. */
+             gpu_ws_set_auto_hooks(gc.ws_auto_screen_x_cull ? 1 : 0,
+                                   gc.ws_auto_backdrop_preload ? 1 : 0);
++            gpu_ws_set_cull_screen_x_sites(
++                gc.ws_cull_screen_x_sites.data(),
++                (int)gc.ws_cull_screen_x_sites.size());
+             if (!gc.ws_cull_w_imms.empty() || !gc.ws_cull_h_imms.empty())
+                 gpu_ws_set_cull_imms(gc.ws_cull_w_imms.data(), (int)gc.ws_cull_w_imms.size(),
+                                      gc.ws_cull_h_imms.data(), (int)gc.ws_cull_h_imms.size());
+diff --git a/runtime/tests/test_ws_cull_edge_interp.c b/runtime/tests/test_ws_cull_edge_interp.c
+index b1e01206..5baf3a7b 100644
+--- a/runtime/tests/test_ws_cull_edge_interp.c
++++ b/runtime/tests/test_ws_cull_edge_interp.c
+@@ -8,7 +8,7 @@
+  *
+  *   - the store: masking to physical addresses, sort, de-duplication, lookups
+  *     at both ends and between entries, the 256-entry cap and its log line,
+- *     empty and negative-count lists, the clip-edge width default;
++ *     empty and negative-count lists, and explicit screen-X sites;
+  *   - psx_ws_cull_bgez / psx_ws_clip_edge_x through a forced margin;
+  *   - real interpreted instructions (exec_one_fetched) at margin 0 and at a
+  *     forced margin: BGEZ and BLTZ sites, BNE and BLEZ branch-keep sites, and
+@@ -244,6 +244,17 @@ static void test_store(void) {
+           !psx_ws_is_cull_slti_site(0x80030008u), "slti_sites store");
+     gpu_ws_set_explicit_cull_sites(NULL, 0, NULL, 0, NULL, 0);
+ 
++    const uint32_t screen_x[] = { 0x80030020u, 0x00030010u, 0x80030020u };
++    gpu_ws_set_cull_screen_x_sites(screen_x, 3);
++    CHECK(ws_explicit_screen_x_n == 2, "screen_x_sites de-duplicated");
++    CHECK(psx_ws_is_cull_screen_x_site(0xA0030020u) &&
++          psx_ws_is_cull_screen_x_site(0x80030010u) &&
++          !psx_ws_is_cull_screen_x_site(0x80030018u),
++          "screen_x_sites uses physical addresses and exact lookup");
++    gpu_ws_set_cull_screen_x_sites(NULL, 0);
++    CHECK(!psx_ws_is_cull_screen_x_site(0x80030020u),
++          "empty screen_x_sites clears prior entries");
++
+     /* Cap: exactly 256 is silent and complete. */
+     for (int i = 0; i < 300; i++)
+         big_list[i] = 0x80040000u + 4u * (uint32_t)(299 - i); /* descending */
+@@ -315,6 +326,10 @@ static void test_interpreter(void) {
+     const uint32_t blez_site = CODE + 0x030, blez_plain = CODE + 0x130;
+     const uint32_t lh_site   = CODE + 0x040, lh_plain   = CODE + 0x140;
+     const uint32_t lhu_site  = CODE + 0x050, lw_site    = CODE + 0x060;
++    const uint32_t sltiu_x_site = CODE + 0x070;
++    const uint32_t lui_x_site = CODE + 0x080;
++    const uint32_t bltz_x_site = CODE + 0x090;
++    const uint32_t sltiu_x_plain = CODE + 0x170;
+ 
+     const uint32_t bgez = i_type(0x01, V0, 0x01, 3);  /* bgez v0,+3 */
+     const uint32_t bltz = i_type(0x01, V0, 0x00, 3);  /* bltz v0,+3 */
+@@ -323,17 +338,46 @@ static void test_interpreter(void) {
+     const uint32_t lh   = i_type(0x21, A0, V0, 0x70); /* lh   v0,0x70(a0) */
+     const uint32_t lhu  = i_type(0x25, A0, V0, 0x70); /* lhu  v0,0x70(a0) */
+     const uint32_t lw   = i_type(0x23, A0, V0, 0x70); /* lw   v0,0x70(a0) */
++    const uint32_t sltiu_x = i_type(0x0B, V1, V0, 0x200);
++    const uint32_t lui_x = i_type(0x0F, 0, V1, 0x200);
+ 
+     const uint32_t bltz_l[] = { bltz_site }, bgez_l[] = { bgez_site };
+     const uint32_t keep_l[] = { bne_site, blez_site };
+     const uint32_t clip_l[] = { lh_site, lhu_site, lw_site };
++    const uint32_t screen_x_l[] = { sltiu_x_site, lui_x_site, bltz_x_site };
+     gpu_ws_set_branch_cull_sites(bltz_l, 1, bgez_l, 1, keep_l, 2);
+     gpu_ws_set_clip_edge_x_load_sites(clip_l, 3, 320);
++    gpu_ws_set_cull_screen_x_sites(screen_x_l, 3);
+ 
+     for (int pass = 0; pass < 2; pass++) {
+         const int m = pass ? 53 : 0;
+         gpu_ws_set_margin_override(m);
+ 
++        cpu.gpr[V1] = (uint32_t)-53;
++        CHECK(load(&cpu, sltiu_x_site, sltiu_x) == (m > 0 ? 1u : 0u),
++              "explicit screen-X sltiu left margin, m=%d", m);
++        cpu.gpr[V1] = 564;
++        CHECK(load(&cpu, sltiu_x_site, sltiu_x) == (m > 0 ? 1u : 0u),
++              "explicit screen-X sltiu right edge, m=%d", m);
++        cpu.gpr[V1] = 565;
++        CHECK(load(&cpu, sltiu_x_site, sltiu_x) == 0u,
++              "explicit screen-X sltiu right margin, m=%d", m);
++        cpu.gpr[V1] = (uint32_t)-53;
++        CHECK(load(&cpu, sltiu_x_plain, sltiu_x) == 0u,
++              "unlisted screen-X sltiu remains vanilla, m=%d", m);
++
++        cpu.gpr[V1] = 0;
++        (void)step(&cpu, lui_x_site, lui_x);
++        CHECK(cpu.gpr[V1] == (uint32_t)(0x200 + m) << 16,
++              "explicit screen-X lui bound, m=%d", m);
++
++        cpu.gpr[V0] = (uint32_t)-10 << 16;
++        CHECK(branch_taken(&cpu, bltz_x_site, bltz) == (m == 0),
++              "explicit screen-X high-half bltz at -10, m=%d", m);
++        cpu.gpr[V0] = (uint32_t)-54 << 16;
++        CHECK(branch_taken(&cpu, bltz_x_site, bltz) == 1,
++              "explicit screen-X high-half bltz at -54, m=%d", m);
++
+         /* bgez: x0 = -10 sits in the revealed band when m = 53. */
+         cpu.gpr[V0] = (uint32_t)-10;
+         CHECK(branch_taken(&cpu, bgez_site, bgez) == (m > 0),
+@@ -399,6 +443,7 @@ static void test_interpreter(void) {
+     gpu_ws_set_margin_override(-1);
+     gpu_ws_set_branch_cull_sites(NULL, 0, NULL, 0, NULL, 0);
+     gpu_ws_set_clip_edge_x_load_sites(NULL, 0, 0);
++    gpu_ws_set_cull_screen_x_sites(NULL, 0);
+ }
+ 
+ static void test_masked_reject(void) {

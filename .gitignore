@@ -24,6 +24,7 @@
 /bios/
 /isos/
 /saves/
+/saves_*/
 /prepared_disc/
 /disc/
 .settings/

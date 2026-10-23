@@ -30780,8 +30780,7 @@ block_8001A58C:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x10008u);
 #endif
-    { uint32_t _pgx1 = cpu->gpr[3]; cpu->gpr[16] = (cpu->gpr[3] < (uint32_t)512) ? 1 : 0;
-    PGXP_ALU(0x2C700200u, cpu->gpr[16], _pgx1, 0x0200u); }  /* 0x8001A71C: 0x2C700200 */
+cpu->gpr[16] = psx_ws_cull_sltiu(cpu->gpr[3], 512); /* ws explicit screen-x cull */  /* 0x8001A71C: 0x2C700200 */
 #ifdef PSX_COSIM
     cosim_instr(0x8001A71Cu);
 #endif

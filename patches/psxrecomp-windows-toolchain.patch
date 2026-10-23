@@ -1,0 +1,1122 @@
+diff --git a/docs/BIOS_SELECTION.md b/docs/BIOS_SELECTION.md
+index ea8abe2a..71c18529 100644
+--- a/docs/BIOS_SELECTION.md
++++ b/docs/BIOS_SELECTION.md
+@@ -45,6 +45,12 @@ the runtime:
+    existing selection path then sees it as one more linked backend: `bios.cfg`
+    remembers it, netplay settle sees it, and it is hot-swapped like OpenBIOS.
+ 
++On Windows, the selected GCC-compatible compiler must pass a native-DLL probe
++for the runtime architecture. Both newly built and cached modules are checked
++for PE architecture and direct MSYS/Cygwin runtime imports before `LoadLibrary`.
++An incompatible cache entry remains on disk; an allowed rebuild publishes its
++replacement atomically.
++
+ The module imports nothing from the executable. Everything it calls goes
+ through `OverlayCallbacks` plus a BIOS-specific `PsxBiosModuleCallbacks`
+ table, and the runtime globals the generated dispatcher reads are aliased by
+diff --git a/docs/COMPILING_OVERLAYS.md b/docs/COMPILING_OVERLAYS.md
+index 011183f4..0a29b5ec 100644
+--- a/docs/COMPILING_OVERLAYS.md
++++ b/docs/COMPILING_OVERLAYS.md
+@@ -107,6 +107,17 @@ shards up automatically.
+ | `--jobs N` | Parallel workers (default: CPU cores − 2). Regions compile independently, so this is a large speedup on a full capture set. `--jobs 1` forces the sequential path. |
+ | `--force` | Rebuild shards even if they already exist. Normally the compile is **incremental** — it skips any DLL already present and any function already covered by an existing shard. |
+ 
++**Windows compiler and cache safety.** The runtime and this tool accept only a
++GCC-compatible compiler that can produce a DLL for the runtime's PE architecture.
++When `gcc` is selected from `PATH`, candidates are checked rather than trusting
++the first executable name; Cygwin/MSYS targets are rejected. A configured
++`overlay_toolchain/compiler.txt` choice is preserved and produces a clear error
++if it is missing or incompatible. The emitted DLL is inspected before cache
++publication, and cached DLLs are checked before loading. Legacy DLLs with the
++wrong PE architecture or direct MSYS/Cygwin runtime imports are left on disk,
++ignored by the loader, and replaced atomically when a compatible rebuild is
++produced; caches are not cleared.
++
+ **Where the shards land.** The cache is namespaced so different games, compilers,
+ CPU architectures, and codegen versions never mix:
+ 
+diff --git a/runtime/CMakeLists.txt b/runtime/CMakeLists.txt
+index 76f588f6..180faf6f 100644
+--- a/runtime/CMakeLists.txt
++++ b/runtime/CMakeLists.txt
+@@ -2048,6 +2048,9 @@ if(BUILD_TESTING)
+                  COMMAND ${Python3_EXECUTABLE}
+                          ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_overlay_compile_arch.py
+                          --cc ${CMAKE_C_COMPILER})
++        add_test(NAME windows_native_toolchain_test
++                 COMMAND ${Python3_EXECUTABLE}
++                         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_windows_native_toolchain.py)
+     endif()
+ 
+     # Full card protocol regression: read, write, address echo, per-slot state,
+diff --git a/runtime/src/main.cpp b/runtime/src/main.cpp
+index 00f1faf3..36c7d50a 100644
+--- a/runtime/src/main.cpp
++++ b/runtime/src/main.cpp
+@@ -18488,8 +18488,17 @@ int main(int argc, char** argv) {
+             if (cf.is_open() && std::getline(cf, line)) {
+                 while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' '))
+                     line.pop_back();
+-                std::error_code cec;
+-                if (!line.empty() && std::filesystem::exists(line, cec)) tk_compiler = line;
++                if (!line.empty()) {
++#ifdef _WIN32
++                    /* Preserve an explicit choice so the builder can reject a
++                     * missing or POSIX-targeting compiler instead of silently
++                     * replacing it with whatever `gcc` PATH finds. */
++                    tk_compiler = line;
++#else
++                    std::error_code cec;
++                    if (std::filesystem::exists(line, cec)) tk_compiler = line;
++#endif
++                }
+             }
+         }
+         auto build_toolchain_cmd = [&](const char *compiler) {
+diff --git a/runtime/src/overlay_loader.c b/runtime/src/overlay_loader.c
+index a831bf9f..058abae1 100644
+--- a/runtime/src/overlay_loader.c
++++ b/runtime/src/overlay_loader.c
+@@ -16,6 +16,7 @@ static void overlay_cpu_charge(uint32_t cycles) { psx_cpu_charge(cycles); }
+ #include "lockstep.h"
+ #include "overlay_posix.h"
+ #include "psx_memory.h"
++#include "psx_windows_dll_compat.h"
+ #include <stdint.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -1322,6 +1323,25 @@ static void loader_log(const char *fmt, ...) {
+     va_end(ap);
+ }
+ 
++#ifdef _WIN32
++static HMODULE overlay_load_compatible_dll(const char *path, char *error,
++                                           size_t error_cap) {
++    HANDLE guard = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
++                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++    if (guard == INVALID_HANDLE_VALUE) {
++        if (error && error_cap) snprintf(error, error_cap, "cannot open DLL");
++        return NULL;
++    }
++    if (!psx_windows_dll_compatible(path, error, error_cap)) {
++        CloseHandle(guard);
++        return NULL;
++    }
++    HMODULE module = LoadLibraryA(path);
++    CloseHandle(guard);
++    return module;
++}
++#endif
++
+ const char *overlay_loader_last_msg(void) { return s_last_msg; }
+ 
+ /* ---- Cache index: region_start -> dll path ----------------------------- */
+@@ -1535,7 +1555,12 @@ static DWORD WINAPI overlay_image_warm_main(LPVOID unused) {
+             InterlockedDecrement(&g_overlay_image_warm_pending);
+             continue;
+         }
+-        HMODULE h = LoadLibraryA(job->path);
++        char pe_error[160] = {0};
++        HMODULE h = overlay_load_compatible_dll(job->path, pe_error,
++                                                sizeof(pe_error));
++        if (!h && pe_error[0])
++            loader_log("rejecting incompatible cached DLL %s: %s",
++                       job->path, pe_error);
+         s_image_warm[ci].handle = h;
+         if (InterlockedCompareExchange(&s_image_warm[ci].state,
+                                        h ? 2 : -1, 1) == 1) {
+@@ -2074,7 +2099,8 @@ static int posix_abi_sweep_file(const PsxOverlayCacheFile *file, void *opaque) {
+ static void abi_preflight_sweep(const char *dir) {
+ #ifdef _WIN32
+     char marker[900];
+-    snprintf(marker, sizeof marker, "%s/.abi_%08x.ok", dir, (unsigned)PSX_OVERLAY_ABI_TAG);
++    snprintf(marker, sizeof marker, "%s/.abi_%08x.win-pe.ok", dir,
++             (unsigned)PSX_OVERLAY_ABI_TAG);
+     if (GetFileAttributesA(marker) != INVALID_FILE_ATTRIBUTES) return;  /* swept */
+ 
+     /* Enumerate the DIRECTORY, not the index: the index is capacity-bounded
+@@ -2091,7 +2117,12 @@ static void abi_preflight_sweep(const char *dir) {
+             if (!cache_name_is_immutable(fd.cFileName)) continue;
+             char full[900];
+             snprintf(full, sizeof full, "%s/%s", dir, fd.cFileName);
+-            HMODULE h = LoadLibraryA(full);
++            char pe_error[160] = {0};
++            HMODULE h = overlay_load_compatible_dll(full, pe_error,
++                                                    sizeof(pe_error));
++            if (!h && pe_error[0])
++                loader_log("rejecting incompatible cached DLL %s: %s",
++                           full, pe_error);
+             if (h) {
+                 typedef int (*AbiFn)(void);
+                 AbiFn abi_fn = (AbiFn)GetProcAddress(h, "overlay_abi");
+@@ -2697,7 +2728,12 @@ static int load_overlay_dll(const char *dll_path, ManFn *man, int man_n, int dll
+                             uint64_t manifest_pair_id,
+                             int manifest_has_pair_id,
+                             int manifest_provenance, int tier) {
+-    HMODULE h = prepared ? prepared : LoadLibraryA(dll_path);
++    char pe_error[160] = {0};
++    HMODULE h = prepared ? prepared :
++        overlay_load_compatible_dll(dll_path, pe_error, sizeof(pe_error));
++    if (!h && pe_error[0])
++        loader_log("rejecting incompatible cached DLL %s: %s",
++                   dll_path, pe_error);
+     if (!h) {
+         loader_log("LoadLibrary(%s) failed: %lu", dll_path, GetLastError());
+         return 0;
+@@ -3425,6 +3461,14 @@ OverlayPreparedImage *overlay_loader_prepare_published(const char *dll_path) {
+         free(image);
+         return NULL;
+     }
++    char pe_error[160] = {0};
++    if (!psx_windows_dll_compatible(canon, pe_error, sizeof(pe_error))) {
++        loader_log("rejecting incompatible published DLL %s: %s",
++                   canon, pe_error);
++        CloseHandle(guard);
++        free(image);
++        return NULL;
++    }
+     snprintf(image->path, sizeof(image->path), "%s", canon);
+     image->handle = LoadLibraryA(canon);
+     CloseHandle(guard);
+diff --git a/runtime/src/psx_bios_module.c b/runtime/src/psx_bios_module.c
+index f771a816..12780f42 100644
+--- a/runtime/src/psx_bios_module.c
++++ b/runtime/src/psx_bios_module.c
+@@ -40,6 +40,7 @@
+ #include "psx_bios_backend.h"
+ #include "psx_bios_known_images.h"
+ #include "psx_bios_module.h"
++#include "psx_windows_dll_compat.h"
+ #include "psx_memory.h"
+ #include "psx_segment_miss.h"
+ 
+@@ -154,7 +155,6 @@ static int probe_toolchain(const char *exe_dir, BmToolchain *tk) {
+                 while (n && (tk->gcc[n - 1] == '\n' || tk->gcc[n - 1] == '\r' ||
+                              tk->gcc[n - 1] == ' '))
+                     tk->gcc[--n] = '\0';
+-                if (!file_exists(tk->gcc)) tk->gcc[0] = '\0';
+             }
+             fclose(f);
+         }
+@@ -244,7 +244,20 @@ typedef const PsxBiosBackend *(*BmBackendFn)(void);
+ #if defined(_WIN32)
+ typedef HMODULE BmHandle;
+ static BmHandle bm_open(const char *path, char *err, size_t cap) {
++    char pe_error[160] = {0};
++    HANDLE guard = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
++                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++    if (guard == INVALID_HANDLE_VALUE) {
++        set_err(err, cap, "cannot open module file");
++        return NULL;
++    }
++    if (!psx_windows_dll_compatible(path, pe_error, sizeof(pe_error))) {
++        set_err(err, cap, pe_error);
++        CloseHandle(guard);
++        return NULL;
++    }
+     HMODULE h = LoadLibraryA(path);
++    CloseHandle(guard);
+     if (!h) {
+         char b[256];
+         snprintf(b, sizeof(b), "LoadLibrary failed (%lu)", (unsigned long)GetLastError());
+@@ -512,7 +525,15 @@ int psx_bios_module_is_cached(const char *dump_path, const char *exe_dir) {
+     img = known_for(crc, size);
+     if (!img) return 0;
+     if (!psx_bios_module_cache_path(exe_dir, img->stem, crc, path, sizeof(path))) return 0;
+-    return file_exists(path);
++    if (!file_exists(path)) return 0;
++#ifdef _WIN32
++    {
++        char pe_error[160] = {0};
++        return psx_windows_dll_compatible(path, pe_error, sizeof(pe_error));
++    }
++#else
++    return 1;
++#endif
+ }
+ 
+ static int read_identity(const char *path, uint32_t *crc, uint32_t *size) {
+@@ -567,7 +588,9 @@ const PsxBiosBackend *psx_bios_module_acquire(const char *dump_path, const char
+         b = psx_bios_module_load(path, e, sizeof(e));
+         if (b) return b;
+         note("cached module %s rejected: %s (rebuilding)", path, e);
++#ifndef _WIN32
+         remove(path);
++#endif
+     }
+     if (!allow_build) { set_err(err, err_cap, "not built yet"); return 0; }
+     if (!probe_toolchain(exe_dir, &tk)) {
+diff --git a/runtime/tests/test_overlay_compile_arch.py b/runtime/tests/test_overlay_compile_arch.py
+index 9cecca90..bd35af7f 100644
+--- a/runtime/tests/test_overlay_compile_arch.py
++++ b/runtime/tests/test_overlay_compile_arch.py
+@@ -127,6 +127,8 @@ def shard_command(compiler='gcc', gcc='gcc'):
+         f.write('int overlay_abi(void) { return 0; }\n')
+     ran = _Ran()
+     with mock.patch.object(co.subprocess, 'run', ran), \
++         mock.patch.object(co, 'resolve_windows_gcc', side_effect=lambda value: value), \
++         mock.patch.object(co, 'windows_dll_compatibility', return_value=(True, 'ok')), \
+          contextlib.redirect_stdout(io.StringIO()):
+         co._compile_dll_direct(src, os.path.join(root, 'out.so'),
+                                [os.path.join(root, 'inc')],
+@@ -137,6 +139,8 @@ def shard_command(compiler='gcc', gcc='gcc'):
+ def bios_module_command(gcc='gcc'):
+     ran = _Ran()
+     with mock.patch.object(bmb.subprocess, 'run', ran), \
++         mock.patch.object(co, 'resolve_windows_gcc', side_effect=lambda value: value), \
++         mock.patch.object(co, 'windows_dll_compatibility', return_value=(True, 'ok')), \
+          contextlib.redirect_stdout(io.StringIO()):
+         bmb.compile_module(['/x/a.c'], '/x/m.so', ['/x/inc'],
+                            'SCPH1001', 0, 'gcc', gcc, 'tcc')
+diff --git a/runtime/tests/test_release_stage_cache.py b/runtime/tests/test_release_stage_cache.py
+index f44da3cd..377d2ad3 100644
+--- a/runtime/tests/test_release_stage_cache.py
++++ b/runtime/tests/test_release_stage_cache.py
+@@ -375,6 +375,7 @@ class ToolchainStagingTest(unittest.TestCase):
+         for d in (self.tools, self.include, self.bios, self.recomp, self.mingw):
+             os.makedirs(d, exist_ok=True)
+         touch(os.path.join(self.tools, 'compile_overlays.py'))
++        touch(os.path.join(self.tools, 'windows_dll.py'))
+         touch(os.path.join(self.tools, 'bios_module_build.py'))
+         touch(os.path.join(self.include, 'overlay_api.h'))
+         touch(os.path.join(self.include, 'overlay_dispatch_preamble.c.inc'))
+diff --git a/tools/bios_module_build.py b/tools/bios_module_build.py
+index bb1a218a..198bb292 100644
+--- a/tools/bios_module_build.py
++++ b/tools/bios_module_build.py
+@@ -141,6 +141,12 @@ def compile_module(sources: list[str], out: str, include_dirs: list[str],
+             cmd.append("-I" + co.native_path(co._bom_free_incdir(d)))
+         env = None
+     else:
++        if co.is_windows():
++            try:
++                gcc = co.resolve_windows_gcc(gcc)
++            except RuntimeError as exc:
++                print(f"  COMPILE ERROR: {exc}")
++                return False
+         env, tc_dir = co._toolchain_env(gcc)
+         pic = [] if co.is_windows() else ["-fPIC"]
+         cmd = [gcc, "-shared", *pic, *co.target_arch_flags("gcc"), "-O2", *defines,
+@@ -155,6 +161,12 @@ def compile_module(sources: list[str], out: str, include_dirs: list[str],
+         msg = (r.stderr or r.stdout or "").strip() or "(no compiler output)"
+         print(f"  COMPILE ERROR (exit {r.returncode}):\n{msg}")
+         return False
++    if co.is_windows():
++        compatible, reason = co.windows_dll_compatibility(
++            out, co.cache_arch_abi())
++        if not compatible:
++            print(f"  COMPILE ERROR: incompatible Windows DLL: {reason}")
++            return False
+     return True
+ 
+ 
+@@ -162,6 +174,12 @@ def self_check(path: str, flavor: int) -> bool:
+     """Load the fresh module in this interpreter: proves it is self-contained
+     (RTLD_NOW resolves every symbol or fails) and that its ABI tag names the
+     flavor asked for. The host repeats the gate with its own tag."""
++    if co.is_windows():
++        compatible, reason = co.windows_dll_compatibility(
++            path, co.cache_arch_abi())
++        if not compatible:
++            print(f"  self-check: incompatible Windows DLL: {reason}")
++            return False
+     try:
+         lib = ctypes.CDLL(co.native_path(path))
+     except OSError as exc:
+diff --git a/tools/compile_overlays.py b/tools/compile_overlays.py
+index 5d47ec7d..809c46f7 100644
+--- a/tools/compile_overlays.py
++++ b/tools/compile_overlays.py
+@@ -57,6 +57,13 @@ import json
+ import platform
+ import re
+ import sysconfig
++import shutil
++
++# The embedded Windows Python runs in isolated mode (python313._pth), so the
++# script directory is not on sys.path and sibling modules would not import.
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++
++from windows_dll import windows_dll_compatibility  # noqa: E402
+ 
+ 
+ def codegen_ver(runtime_include: str) -> int:
+@@ -5007,16 +5014,20 @@ def _toolchain_env(gcc: str):
+     import shutil
+     env = os.environ.copy()
+     cands = []
++    if is_windows() and (('/' in gcc) or ('\\' in gcc)):
++        cands.append(os.path.dirname(os.path.abspath(gcc)))
+     if os.environ.get('PSX_MINGW_BIN'):
+         cands.append(os.environ['PSX_MINGW_BIN'])
+-    if ('/' in gcc) or ('\\' in gcc):
++    if not is_windows() and (('/' in gcc) or ('\\' in gcc)):
+         cands.append(os.path.dirname(os.path.abspath(gcc)))
+     w = shutil.which(gcc)
+     if w:
+         cands.append(os.path.dirname(w))
+     cands += [r'C:\msys64\mingw64\bin', r'C:\mingw64\bin', '/usr/bin']
++    compiler_name = os.path.basename(gcc)
+     for d in cands:
+-        if d and (os.path.isfile(os.path.join(d, 'gcc.exe')) or
++        if d and (os.path.isfile(os.path.join(d, compiler_name)) or
++                  os.path.isfile(os.path.join(d, 'gcc.exe')) or
+                   os.path.isfile(os.path.join(d, 'gcc'))):
+             # Prepend in the RUNNING INTERPRETER'S path flavor. Under an
+             # MSYS-flavored python (os.sep == '/'), PATH is a ':'-separated
+@@ -5037,6 +5048,100 @@ def _toolchain_env(gcc: str):
+     return env, None
+ 
+ 
++_WINDOWS_COMPILER_PROBES = {}
++
++
++def _windows_compiler_candidates(gcc: str) -> tuple[list[str], bool]:
++    """Return ordered compiler paths and whether the selection is explicit."""
++    token = gcc.strip().strip('"')
++    standard_names = {"gcc", "gcc.exe", "cc", "cc.exe", "clang", "clang.exe"}
++    explicit = (os.path.isabs(token) or "/" in token or "\\" in token or
++                os.path.basename(token).lower() not in standard_names)
++    if explicit:
++        return [os.path.abspath(token)], True
++
++    names = ["gcc.exe", "clang.exe", "cc.exe"]
++    dirs = []
++    override = os.environ.get("PSX_MINGW_BIN")
++    if override:
++        dirs.append(override)
++    dirs.extend(os.environ.get("PATH", "").split(os.pathsep))
++    dirs.extend([r"C:\msys64\mingw64\bin", r"C:\mingw64\bin"])
++    candidates = []
++    seen = set()
++    for directory in dirs:
++        if not directory:
++            continue
++        for name in names:
++            path = os.path.abspath(os.path.join(directory, name))
++            key = os.path.normcase(path)
++            if key not in seen and os.path.isfile(path):
++                candidates.append(path)
++                seen.add(key)
++    return candidates, False
++
++
++def _probe_windows_compiler(path: str, arch_abi: str) -> tuple[bool, str]:
++    """Compile and inspect a real DLL; target strings alone are not trusted."""
++    import tempfile
++
++    key = (os.path.normcase(path), arch_abi, os.environ.get("PATH", ""))
++    if key in _WINDOWS_COMPILER_PROBES:
++        return _WINDOWS_COMPILER_PROBES[key]
++
++    try:
++        triple = subprocess.run([path, "-dumpmachine"], capture_output=True,
++                                text=True, timeout=10)
++    except (OSError, subprocess.SubprocessError):
++        triple = None
++    target = (triple.stdout or "").strip().lower() if triple else ""
++    if any(marker in target for marker in ("cygwin", "msys", "linux", "darwin")):
++        result = (False, f"compiler target is not native Windows: {target or '(unknown)'}")
++        _WINDOWS_COMPILER_PROBES[key] = result
++        return result
++
++    env, _tc_dir = _toolchain_env(path)
++    with tempfile.TemporaryDirectory(prefix="psx_win_compiler_probe_") as work:
++        source = os.path.join(work, "probe.c")
++        output = os.path.join(work, "probe.dll")
++        with open(source, "w", encoding="ascii") as f:
++            f.write("int psx_windows_toolchain_probe(void) { return 0; }\n")
++        command = [path, "-shared", "-O2", source, "-o", output]
++        try:
++            compiled = subprocess.run(command, capture_output=True, text=True,
++                                      timeout=60, env=env)
++        except (OSError, subprocess.SubprocessError) as exc:
++            result = (False, f"native DLL probe failed to run: {exc}")
++            _WINDOWS_COMPILER_PROBES[key] = result
++            return result
++        if compiled.returncode != 0:
++            detail = (compiled.stderr or compiled.stdout or "").strip()
++            result = (False, f"native DLL probe failed: {detail or compiled.returncode}")
++        else:
++            result = windows_dll_compatibility(output, arch_abi)
++    _WINDOWS_COMPILER_PROBES[key] = result
++    return result
++
++
++def resolve_windows_gcc(gcc: str) -> str:
++    """Select only a compiler that emits a native DLL for this runtime."""
++    arch_abi = cache_arch_abi()
++    candidates, explicit = _windows_compiler_candidates(gcc)
++    failures = []
++    for candidate in candidates:
++        compatible, reason = _probe_windows_compiler(candidate, arch_abi)
++        if compatible:
++            return candidate
++        failures.append(f"{candidate}: {reason}")
++        if explicit:
++            break
++    if explicit:
++        detail = failures[0] if failures else f"{gcc}: compiler path not found"
++        raise RuntimeError(f"configured Windows compiler is incompatible: {detail}")
++    details = "; ".join(failures) if failures else "no GCC-compatible compiler found on PATH"
++    raise RuntimeError(f"no compatible native Windows compiler found ({details})")
++
++
+ # ---- TinyCC (tcc) overlay compile — toolchain-free user fallback -----------
+ # tcc has its own built-in linker (no ld/collect2) and bundles its own headers,
+ # so it is self-contained. The only friction is that tcc 0.9.27 does not skip a
+@@ -5130,6 +5235,11 @@ def _compile_dll_tcc(c_path: str, out_dll: str, include_dirs, flavor: int,
+     if r.returncode != 0:
+         print(f'  TCC COMPILE ERROR (exit {r.returncode}):\n{r.stderr or r.stdout}')
+         return False
++    if is_windows():
++        compatible, reason = windows_dll_compatibility(out_dll, cache_arch_abi())
++        if not compatible:
++            print(f'  TCC COMPILE ERROR: incompatible Windows DLL: {reason}')
++            return False
+     return True
+ 
+ 
+@@ -5144,6 +5254,12 @@ def _compile_dll_direct(c_path: str, out_dll: str, include_dirs: list[str],
+     out_dll = native_path(out_dll)
+     if compiler == 'tcc':
+         return _compile_dll_tcc(c_path, out_dll, include_dirs, flavor, tcc)
++    if is_windows():
++        try:
++            gcc = resolve_windows_gcc(gcc)
++        except RuntimeError as exc:
++            print(f'  COMPILE ERROR: {exc}')
++            return False
+     env, tc_dir = _toolchain_env(gcc)
+     includes = [f'-I{native_path(d)}' for d in include_dirs]
+     # On Windows, DLLs use PE relocations — -fPIC triggers GCC CRT init
+@@ -5195,6 +5311,11 @@ def _compile_dll_direct(c_path: str, out_dll: str, include_dirs: list[str],
+                    'all paths above are OS-native)')
+         print(f'  COMPILE ERROR (exit {r.returncode}):\n{msg}')
+         return False
++    if is_windows():
++        compatible, reason = windows_dll_compatibility(out_dll, cache_arch_abi())
++        if not compatible:
++            print(f'  COMPILE ERROR: incompatible Windows DLL: {reason}')
++            return False
+     return True
+ 
+ 
+@@ -6094,6 +6215,11 @@ def _dll_abi_matches(dll_path: str, expected_abi: int) -> bool:
+     import ctypes
+     library = None
+     try:
++        if os.name == 'nt':
++            compatible, _reason = windows_dll_compatibility(
++                dll_path, cache_arch_abi())
++            if not compatible:
++                return False
+         # Shards are generated as ordinary C (cdecl). ctypes.WinDLL selects
+         # stdcall and can corrupt a 32-bit Windows caller's stack; CDLL is the
+         # correct loader on every supported host (x64 merely masks the error).
+@@ -6120,6 +6246,11 @@ def _dll_pair_id_matches(dll_path: str, expected_pair_id: int) -> bool:
+     import ctypes
+     library = None
+     try:
++        if os.name == 'nt':
++            compatible, _reason = windows_dll_compatibility(
++                dll_path, cache_arch_abi())
++            if not compatible:
++                return False
+         library = ctypes.CDLL(dll_path)
+         pair_fn = library.overlay_pair_id
+         pair_fn.argtypes = []
+@@ -6145,6 +6276,11 @@ def _dll_runtime_exports_match(dll_path: str, expected_abi: int | None,
+     import ctypes
+     library = None
+     try:
++        if os.name == 'nt':
++            compatible, _reason = windows_dll_compatibility(
++                dll_path, cache_arch_abi())
++            if not compatible:
++                return False
+         library = ctypes.CDLL(dll_path)
+         abi_fn = library.overlay_abi
+         abi_fn.argtypes = []
+diff --git a/tools/release_stage.py b/tools/release_stage.py
+index 00bd0c6c..4c7bbb61 100644
+--- a/tools/release_stage.py
++++ b/tools/release_stage.py
+@@ -831,6 +831,7 @@ def stage_toolchain(stage, recomp_dir, recomp_tools, recomp_include, dl_cache,
+             % (copied, dll_src, '' if copied else ' -- assuming a static recompiler'))
+ 
+     shutil.copy2(os.path.join(recomp_tools, 'compile_overlays.py'), toolchain)
++    shutil.copy2(os.path.join(recomp_tools, 'windows_dll.py'), toolchain)
+     # The BIOS module builder (docs/BIOS_SELECTION.md, "player-side backend
+     # build"): turns the player's own retail dump into a loadable backend with
+     # the same interpreter and compiler the overlay path uses. It needs the
+@@ -873,6 +874,7 @@ def stage_toolchain(stage, recomp_dir, recomp_tools, recomp_include, dl_cache,
+     for required in (os.path.join('include', 'overlay_dispatch_preamble.c.inc'),
+                      os.path.join('include', 'psx_bios_module_glue.c.inc'),
+                      os.path.join('include', 'psx_bios_module.h'),
++                     'windows_dll.py',
+                      'bios_module_build.py',
+                      os.path.join('bios', 'SCPH1001.toml'),
+                      os.path.join('recompiler', 'seeds', 'phase2_ghidra_seeds.json')):
+diff --git a/runtime/include/psx_windows_dll_compat.h b/runtime/include/psx_windows_dll_compat.h
+new file mode 100644
+index 00000000..ce0bbccd
+--- /dev/null
++++ b/runtime/include/psx_windows_dll_compat.h
+@@ -0,0 +1,182 @@
++#ifndef PSX_WINDOWS_DLL_COMPAT_H
++#define PSX_WINDOWS_DLL_COMPAT_H
++
++#ifdef _WIN32
++
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++static int psx_pe_read_u16(const unsigned char *data, size_t size,
++                           size_t offset, uint16_t *value) {
++    if (offset > size || size - offset < 2) return 0;
++    *value = (uint16_t)data[offset] | (uint16_t)data[offset + 1] << 8;
++    return 1;
++}
++
++static int psx_pe_read_u32(const unsigned char *data, size_t size,
++                           size_t offset, uint32_t *value) {
++    if (offset > size || size - offset < 4) return 0;
++    *value = (uint32_t)data[offset] |
++             (uint32_t)data[offset + 1] << 8 |
++             (uint32_t)data[offset + 2] << 16 |
++             (uint32_t)data[offset + 3] << 24;
++    return 1;
++}
++
++static int psx_pe_rva_offset(const unsigned char *data, size_t size,
++                             size_t section_table, uint16_t section_count,
++                             uint32_t headers_size, uint32_t rva,
++                             size_t *offset) {
++    if (rva < headers_size && rva < size) {
++        *offset = (size_t)rva;
++        return 1;
++    }
++    for (uint16_t i = 0; i < section_count; ++i) {
++        size_t row = section_table + (size_t)i * 40;
++        uint32_t virtual_size, virtual_address, raw_size, raw_offset;
++        if (!psx_pe_read_u32(data, size, row + 8, &virtual_size) ||
++            !psx_pe_read_u32(data, size, row + 12, &virtual_address) ||
++            !psx_pe_read_u32(data, size, row + 16, &raw_size) ||
++            !psx_pe_read_u32(data, size, row + 20, &raw_offset))
++            return 0;
++        uint32_t span = virtual_size > raw_size ? virtual_size : raw_size;
++        if (rva >= virtual_address && rva - virtual_address < span) {
++            uint32_t delta = rva - virtual_address;
++            if (delta >= raw_size || raw_offset > size ||
++                delta > size - raw_offset)
++                return 0;
++            *offset = (size_t)raw_offset + delta;
++            return 1;
++        }
++    }
++    return 0;
++}
++
++static int psx_ascii_name_equal(const unsigned char *name, const char *expected) {
++    while (*expected) {
++        unsigned char a = *name++;
++        unsigned char b = (unsigned char)*expected++;
++        if (a >= 'A' && a <= 'Z') a = (unsigned char)(a + ('a' - 'A'));
++        if (b >= 'A' && b <= 'Z') b = (unsigned char)(b + ('a' - 'A'));
++        if (a != b) return 0;
++    }
++    return *name == '\0';
++}
++
++static int psx_windows_dll_compatible(const char *path, char *error,
++                                      size_t error_cap) {
++    FILE *file = NULL;
++    unsigned char *data = NULL;
++    long file_size;
++    uint32_t pe_offset, headers_size;
++    uint16_t machine, section_count, optional_size, magic;
++    uint32_t directory_count, import_rva, import_size;
++    size_t optional, section_table, import_offset;
++    int ok = 0;
++#if defined(_M_ARM64) || defined(__aarch64__)
++    const uint16_t expected_machine = 0xAA64;
++#elif defined(_M_IX86) || defined(__i386__)
++    const uint16_t expected_machine = 0x014C;
++#else
++    const uint16_t expected_machine = 0x8664;
++#endif
++
++#define PSX_PE_FAIL(message) do { \
++    if (error && error_cap) snprintf(error, error_cap, "%s", (message)); \
++    goto done; \
++} while (0)
++
++    file = fopen(path, "rb");
++    if (!file || fseek(file, 0, SEEK_END) != 0 ||
++        (file_size = ftell(file)) < 64 || fseek(file, 0, SEEK_SET) != 0)
++        PSX_PE_FAIL("cannot read PE file");
++    data = (unsigned char *)malloc((size_t)file_size);
++    if (!data || fread(data, 1, (size_t)file_size, file) != (size_t)file_size)
++        PSX_PE_FAIL("cannot read PE contents");
++    if (data[0] != 'M' || data[1] != 'Z' ||
++        !psx_pe_read_u32(data, (size_t)file_size, 0x3C, &pe_offset) ||
++        pe_offset > (uint32_t)file_size ||
++        (size_t)file_size - pe_offset < 24 ||
++        memcmp(data + pe_offset, "PE\0\0", 4) != 0)
++        PSX_PE_FAIL("invalid PE signature");
++    if (!psx_pe_read_u16(data, (size_t)file_size, pe_offset + 4, &machine) ||
++        !psx_pe_read_u16(data, (size_t)file_size, pe_offset + 6, &section_count) ||
++        !psx_pe_read_u16(data, (size_t)file_size, pe_offset + 20, &optional_size))
++        PSX_PE_FAIL("truncated PE COFF header");
++    if (machine != expected_machine) PSX_PE_FAIL("PE machine does not match runtime");
++    optional = (size_t)pe_offset + 24;
++    if (optional > (size_t)file_size ||
++        optional_size > (size_t)file_size - optional ||
++        !psx_pe_read_u16(data, (size_t)file_size, optional, &magic))
++        PSX_PE_FAIL("truncated PE optional header");
++    if (magic == 0x10B) {
++        if (optional_size < 96) PSX_PE_FAIL("truncated PE32 optional header");
++        if (!psx_pe_read_u32(data, (size_t)file_size, optional + 92,
++                             &directory_count))
++            PSX_PE_FAIL("truncated PE32 directories");
++        import_rva = import_size = 0;
++        if (directory_count > 1 && optional_size < 112)
++            PSX_PE_FAIL("truncated PE32 import directory");
++        if (directory_count > 1 &&
++            (!psx_pe_read_u32(data, (size_t)file_size, optional + 104,
++                              &import_rva) ||
++             !psx_pe_read_u32(data, (size_t)file_size, optional + 108,
++                              &import_size)))
++            PSX_PE_FAIL("truncated PE32 import directory");
++    } else if (magic == 0x20B) {
++        if (optional_size < 112) PSX_PE_FAIL("truncated PE32+ optional header");
++        if (!psx_pe_read_u32(data, (size_t)file_size, optional + 108,
++                             &directory_count))
++            PSX_PE_FAIL("truncated PE32+ directories");
++        import_rva = import_size = 0;
++        if (directory_count > 1 && optional_size < 128)
++            PSX_PE_FAIL("truncated PE32+ import directory");
++        if (directory_count > 1 &&
++            (!psx_pe_read_u32(data, (size_t)file_size, optional + 120,
++                              &import_rva) ||
++             !psx_pe_read_u32(data, (size_t)file_size, optional + 124,
++                              &import_size)))
++            PSX_PE_FAIL("truncated PE32+ import directory");
++    } else {
++        PSX_PE_FAIL("unsupported PE optional-header format");
++    }
++    if (!import_rva || !import_size) { ok = 1; goto done; }
++    if (!psx_pe_read_u32(data, (size_t)file_size, optional + 60, &headers_size))
++        PSX_PE_FAIL("truncated PE headers");
++    section_table = optional + optional_size;
++    if (section_table > (size_t)file_size ||
++        (size_t)section_count > ((size_t)file_size - section_table) / 40 ||
++        !psx_pe_rva_offset(data, (size_t)file_size, section_table,
++                           section_count, headers_size, import_rva,
++                           &import_offset))
++        PSX_PE_FAIL("invalid PE import table");
++    for (size_t cursor = import_offset, remaining = import_size;
++         remaining >= 20 && cursor <= (size_t)file_size &&
++         (size_t)file_size - cursor >= 20; cursor += 20, remaining -= 20) {
++        uint32_t name_rva;
++        size_t name_offset;
++        if (!psx_pe_read_u32(data, (size_t)file_size, cursor + 12, &name_rva))
++            PSX_PE_FAIL("truncated PE import descriptor");
++        if (!name_rva) { ok = 1; goto done; }
++        if (!psx_pe_rva_offset(data, (size_t)file_size, section_table,
++                               section_count, headers_size, name_rva,
++                               &name_offset) ||
++            !memchr(data + name_offset, '\0', (size_t)file_size - name_offset))
++            PSX_PE_FAIL("invalid PE import name");
++        if (psx_ascii_name_equal(data + name_offset, "msys-2.0.dll") ||
++            psx_ascii_name_equal(data + name_offset, "cygwin1.dll"))
++            PSX_PE_FAIL("disallowed MSYS/Cygwin runtime import");
++    }
++    PSX_PE_FAIL("unterminated PE import table");
++
++done:
++    if (file) fclose(file);
++    free(data);
++#undef PSX_PE_FAIL
++    return ok;
++}
++
++#endif /* _WIN32 */
++#endif /* PSX_WINDOWS_DLL_COMPAT_H */
+diff --git a/runtime/tests/test_windows_native_toolchain.py b/runtime/tests/test_windows_native_toolchain.py
+new file mode 100644
+index 00000000..5ab99c8f
+--- /dev/null
++++ b/runtime/tests/test_windows_native_toolchain.py
+@@ -0,0 +1,225 @@
++#!/usr/bin/env python3
++import os
++import platform
++import shutil
++import struct
++import subprocess
++import sys
++import tempfile
++import unittest
++import ctypes
++from unittest import mock
++
++ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
++sys.path.insert(0, os.path.join(ROOT, "tools"))
++
++import bios_module_build as bios  # noqa: E402
++import compile_overlays as co  # noqa: E402
++from windows_dll import windows_dll_compatibility  # noqa: E402
++
++
++def make_pe(path, imports=(), machine=0x8664):
++    data = bytearray(0x400)
++    data[:2] = b"MZ"
++    struct.pack_into("<I", data, 0x3C, 0x80)
++    data[0x80:0x84] = b"PE\0\0"
++    coff = 0x84
++    struct.pack_into("<HHIIIHH", data, coff, machine, 1, 0, 0, 0, 240, 0)
++    optional = coff + 20
++    struct.pack_into("<H", data, optional, 0x20B)
++    struct.pack_into("<I", data, optional + 60, 0x200)
++    struct.pack_into("<I", data, optional + 108, 16)
++    section_table = optional + 240
++    if imports:
++        struct.pack_into("<II", data, optional + 120, 0x1000,
++                         20 * (len(imports) + 1))
++    data[section_table:section_table + 8] = b".rdata\0\0"
++    struct.pack_into("<IIII", data, section_table + 8,
++                     0x200, 0x1000, 0x200, 0x200)
++    if imports:
++        for index, name in enumerate(imports):
++            descriptor = 0x200 + index * 20
++            name_rva = 0x1040 + index * 64
++            struct.pack_into("<I", data, descriptor + 12, name_rva)
++            name_offset = 0x200 + (name_rva - 0x1000)
++            encoded = name.encode("ascii") + b"\0"
++            data[name_offset:name_offset + len(encoded)] = encoded
++    with open(path, "wb") as output:
++        output.write(data)
++
++
++class WindowsDLLCompatibilityTests(unittest.TestCase):
++    def test_native_dll_is_accepted_and_legacy_posix_import_is_rejected(self):
++        with tempfile.TemporaryDirectory() as directory:
++            native = os.path.join(directory, "native.dll")
++            legacy = os.path.join(directory, "legacy.dll")
++            make_pe(native, ("KERNEL32.dll", "msvcrt.dll"))
++            make_pe(legacy, ("KERNEL32.dll", "msys-2.0.dll"))
++            self.assertEqual(windows_dll_compatibility(native, "win-x64"),
++                             (True, "ok"))
++            accepted, reason = windows_dll_compatibility(legacy, "win-x64")
++            self.assertFalse(accepted)
++            self.assertIn("msys-2.0.dll", reason)
++
++    def test_wrong_pe_architecture_is_rejected(self):
++        with tempfile.TemporaryDirectory() as directory:
++            path = os.path.join(directory, "x86.dll")
++            make_pe(path, ("KERNEL32.dll",), machine=0x014C)
++            accepted, reason = windows_dll_compatibility(path, "win-x64")
++            self.assertFalse(accepted)
++            self.assertIn("does not match", reason)
++
++    def test_legacy_cache_is_rejected_before_python_load(self):
++        old_os, old_arch = co._TARGET_OS, co._TARGET_ARCH
++        co.set_target_os("win")
++        co.set_target_arch("x64")
++        try:
++            with tempfile.TemporaryDirectory() as directory:
++                path = os.path.join(directory, "legacy.dll")
++                make_pe(path, ("KERNEL32.dll", "msys-2.0.dll"))
++                with mock.patch.object(co.os, "name", "nt"), \
++                     mock.patch.object(ctypes, "CDLL") as load:
++                    self.assertFalse(co._dll_runtime_exports_match(
++                        path, None, None, {0x80001000}))
++                    load.assert_not_called()
++        finally:
++            co.set_target_os(old_os)
++            co.set_target_arch(old_arch)
++
++    def test_runtime_c_preflight_accepts_native_and_rejects_posix_import(self):
++        compiler = shutil.which("cc") or shutil.which("clang")
++        if not compiler:
++            self.skipTest("no C compiler available for the runtime preflight test")
++        machine = {
++            "x64": 0x8664,
++            "arm64": 0xAA64,
++            "x86": 0x014C,
++            "x86_64": 0x8664,
++            "AMD64": 0x8664,
++            "aarch64": 0xAA64,
++            "i386": 0x014C,
++            "i686": 0x014C,
++        }.get(co.interpreter_arch())
++        if machine is None:
++            self.skipTest(f"unsupported test interpreter architecture {co.interpreter_arch()}")
++        source = """
++            #include "psx_windows_dll_compat.h"
++            #include <string.h>
++            int main(int argc, char **argv) {
++                char error[160] = {0};
++                int compatible = psx_windows_dll_compatible(argv[1], error, sizeof(error));
++                return compatible == (argc < 3) ? 0 : 1;
++            }
++        """
++        include = os.path.join(ROOT, "runtime", "include")
++        with tempfile.TemporaryDirectory() as directory:
++            executable = os.path.join(directory, "pecheck")
++            built = subprocess.run(
++                [compiler, "-std=c99", "-D_WIN32", "-I", include,
++                 "-x", "c", "-", "-o", executable],
++                input=source, text=True, capture_output=True)
++            self.assertEqual(built.returncode, 0, built.stderr)
++            native = os.path.join(directory, "native.dll")
++            legacy = os.path.join(directory, "legacy.dll")
++            wrong_arch = os.path.join(directory, "wrong-arch.dll")
++            make_pe(native, ("KERNEL32.dll", "msvcrt.dll"), machine)
++            make_pe(legacy, ("KERNEL32.dll", "msys-2.0.dll"), machine)
++            other_machine = 0x014C if machine != 0x014C else 0x8664
++            make_pe(wrong_arch, ("KERNEL32.dll",), other_machine)
++            self.assertEqual(subprocess.run([executable, native]).returncode, 0)
++            self.assertEqual(subprocess.run([executable, legacy, "reject"]).returncode, 0)
++            self.assertEqual(subprocess.run(
++                [executable, wrong_arch, "reject"]).returncode, 0)
++
++
++class WindowsCompilerSelectionTests(unittest.TestCase):
++    def setUp(self):
++        self.old_os, self.old_arch = co._TARGET_OS, co._TARGET_ARCH
++        co.set_target_os("win")
++        co.set_target_arch("x64")
++        co._WINDOWS_COMPILER_PROBES.clear()
++        self.directory = tempfile.TemporaryDirectory()
++        self.bad_dir = os.path.join(self.directory.name, "cygwin")
++        self.good_dir = os.path.join(self.directory.name, "mingw")
++        os.makedirs(self.bad_dir)
++        os.makedirs(self.good_dir)
++        self.bad = os.path.join(self.bad_dir, "gcc.exe")
++        self.good = os.path.join(self.good_dir, "gcc.exe")
++        self.wrapper = os.path.join(self.directory.name, "wrapper.exe")
++        for path in (self.bad, self.good, self.wrapper):
++            with open(path, "wb") as f:
++                f.write(b"test compiler placeholder")
++
++    def tearDown(self):
++        co.set_target_os(self.old_os)
++        co.set_target_arch(self.old_arch)
++        co._WINDOWS_COMPILER_PROBES.clear()
++        self.directory.cleanup()
++
++    def _fake_run(self, command, **kwargs):
++        compiler = command[0]
++        if command[-1] == "-dumpmachine":
++            target = ("x86_64-pc-cygwin" if compiler == self.bad
++                      else "x86_64-w64-mingw32")
++            return co.subprocess.CompletedProcess(command, 0, target, "")
++        output = command[command.index("-o") + 1]
++        imports = ("KERNEL32.dll", "msys-2.0.dll") if compiler == self.wrapper else (
++            "KERNEL32.dll", "msvcrt.dll")
++        make_pe(output, imports)
++        return co.subprocess.CompletedProcess(command, 0, "", "")
++
++    def test_skips_first_cygwin_gcc_and_selects_later_native_mingw(self):
++        path = os.pathsep.join((self.bad_dir, self.good_dir))
++        with mock.patch.dict(os.environ, {"PATH": path}, clear=False), \
++             mock.patch.object(co.subprocess, "run", side_effect=self._fake_run):
++            self.assertEqual(co.resolve_windows_gcc("gcc"), self.good)
++
++    def test_explicit_compatible_and_incompatible_compilers(self):
++        with mock.patch.object(co.subprocess, "run", side_effect=self._fake_run):
++            self.assertEqual(co.resolve_windows_gcc(self.good), self.good)
++            with self.assertRaisesRegex(RuntimeError, "configured Windows compiler"):
++                co.resolve_windows_gcc(self.bad)
++
++    def test_misleading_target_triple_is_rejected_by_emitted_pe(self):
++        with mock.patch.object(co.subprocess, "run", side_effect=self._fake_run):
++            with self.assertRaisesRegex(RuntimeError, "msys-2.0.dll"):
++                co.resolve_windows_gcc(self.wrapper)
++
++    def test_bios_builder_validates_emitted_dll(self):
++        output = os.path.join(self.directory.name, "bios.dll")
++
++        def compile_bad_dll(command, **kwargs):
++            make_pe(output, ("KERNEL32.dll", "cygwin1.dll"))
++            return co.subprocess.CompletedProcess(command, 0, "", "")
++
++        with mock.patch.object(co, "is_windows", return_value=True), \
++             mock.patch.object(co, "native_path", side_effect=lambda path: path), \
++             mock.patch.object(co, "resolve_windows_gcc", return_value=self.good) as resolve, \
++             mock.patch.object(co, "_toolchain_env", return_value=({}, self.good_dir)), \
++             mock.patch.object(bios.subprocess, "run", side_effect=compile_bad_dll):
++            result = bios.compile_module(
++                [os.path.join(self.directory.name, "unit.c")], output, [],
++                "SCPH1001", 0, "gcc", "gcc", "tcc")
++        self.assertFalse(result)
++        resolve.assert_called_once_with("gcc")
++
++
++class ToolchainEntrypointImportTests(unittest.TestCase):
++    def test_script_imports_siblings_without_script_dir_on_sys_path(self):
++        # Set PSX_EMBEDDED_PYTHON to the bundled overlay_toolchain\python\python.exe
++        # to run this against the real embedded interpreter (isolated via ._pth).
++        python = os.environ.get("PSX_EMBEDDED_PYTHON") or sys.executable
++        with tempfile.TemporaryDirectory() as staged, \
++             tempfile.TemporaryDirectory() as cwd:
++            for name in ("compile_overlays.py", "windows_dll.py"):
++                shutil.copy2(os.path.join(ROOT, "tools", name), staged)
++            # -I (like a ._pth embedded Python) leaves the script dir off sys.path.
++            result = subprocess.run(
++                [python, "-I", os.path.join(staged, "compile_overlays.py"), "--help"],
++                cwd=cwd, capture_output=True, text=True)
++        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
++        self.assertNotIn("ModuleNotFoundError", result.stderr)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/windows_dll.py b/tools/windows_dll.py
+new file mode 100644
+index 00000000..d69bf50f
+--- /dev/null
++++ b/tools/windows_dll.py
+@@ -0,0 +1,135 @@
++"""Small PE validation helpers for runtime-generated Windows modules."""
++
++from __future__ import annotations
++
++import os
++import struct
++
++
++_MACHINE_BY_ARCH = {
++    "x86": 0x014C,
++    "x64": 0x8664,
++    "arm64": 0xAA64,
++}
++_POSIX_RUNTIMES = {"msys-2.0.dll", "cygwin1.dll"}
++
++
++class PEFormatError(ValueError):
++    pass
++
++
++def _u16(data: bytes, offset: int) -> int:
++    if offset < 0 or offset + 2 > len(data):
++        raise PEFormatError("truncated PE header")
++    return struct.unpack_from("<H", data, offset)[0]
++
++
++def _u32(data: bytes, offset: int) -> int:
++    if offset < 0 or offset + 4 > len(data):
++        raise PEFormatError("truncated PE header")
++    return struct.unpack_from("<I", data, offset)[0]
++
++
++def pe_machine_and_imports(path: str) -> tuple[int, set[str]]:
++    with open(path, "rb") as source:
++        data = source.read()
++    if len(data) < 64 or data[:2] != b"MZ":
++        raise PEFormatError("missing DOS/PE signature")
++
++    pe_offset = _u32(data, 0x3C)
++    if pe_offset + 24 > len(data) or data[pe_offset:pe_offset + 4] != b"PE\0\0":
++        raise PEFormatError("invalid PE signature")
++    coff = pe_offset + 4
++    machine = _u16(data, coff)
++    sections = _u16(data, coff + 2)
++    optional_size = _u16(data, coff + 16)
++    optional = coff + 20
++    if optional + optional_size > len(data):
++        raise PEFormatError("truncated optional header")
++
++    magic = _u16(data, optional)
++    if magic == 0x10B:
++        directory_offset, count_offset = 96, 92
++    elif magic == 0x20B:
++        directory_offset, count_offset = 112, 108
++    else:
++        raise PEFormatError("unsupported PE optional-header format")
++    if optional_size < directory_offset or _u32(data, optional + count_offset) <= 1:
++        return machine, set()
++    if optional_size < directory_offset + 16:
++        raise PEFormatError("truncated import data directory")
++    import_rva = _u32(data, optional + directory_offset + 8)
++    import_size = _u32(data, optional + directory_offset + 12)
++    if not import_rva or not import_size:
++        return machine, set()
++
++    section_offset = optional + optional_size
++    if section_offset + sections * 40 > len(data):
++        raise PEFormatError("truncated section table")
++    section_rows = []
++    for index in range(sections):
++        row = section_offset + index * 40
++        virtual_size = _u32(data, row + 8)
++        virtual_address = _u32(data, row + 12)
++        raw_size = _u32(data, row + 16)
++        raw_offset = _u32(data, row + 20)
++        section_rows.append((virtual_address, max(virtual_size, raw_size),
++                             raw_size, raw_offset))
++    size_of_headers = _u32(data, optional + 60)
++
++    def rva_offset(rva: int) -> int:
++        if rva < size_of_headers:
++            if rva >= len(data):
++                raise PEFormatError("header RVA is outside the file")
++            return rva
++        for va, span, raw_size, raw_offset in section_rows:
++            if va <= rva < va + span:
++                delta = rva - va
++                if delta >= raw_size or raw_offset + delta >= len(data):
++                    break
++                return raw_offset + delta
++        raise PEFormatError("import RVA is outside file-backed PE sections")
++
++    imports = set()
++    descriptor = rva_offset(import_rva)
++    descriptor_limit = min(len(data), descriptor + import_size)
++    terminated = False
++    while descriptor + 20 <= descriptor_limit:
++        name_rva = _u32(data, descriptor + 12)
++        if name_rva == 0:
++            terminated = True
++            break
++        name_offset = rva_offset(name_rva)
++        end = data.find(b"\0", name_offset, min(len(data), name_offset + 4096))
++        if end < 0:
++            raise PEFormatError("unterminated import name")
++        try:
++            imports.add(data[name_offset:end].decode("ascii").lower())
++        except UnicodeDecodeError as exc:
++            raise PEFormatError("non-ASCII import name") from exc
++        descriptor += 20
++    if not terminated:
++        raise PEFormatError("unterminated PE import table")
++    return machine, imports
++
++
++def windows_dll_compatibility(path: str, arch_abi: str) -> tuple[bool, str]:
++    """Check a generated/cached DLL before any native loader sees it."""
++    try:
++        _os_tag, arch = arch_abi.split("-", 1)
++    except ValueError:
++        return False, f"invalid runtime architecture tag {arch_abi!r}"
++    expected_machine = _MACHINE_BY_ARCH.get(arch)
++    if not arch_abi.startswith("win-") or expected_machine is None:
++        return False, f"unsupported Windows runtime architecture {arch_abi!r}"
++    try:
++        machine, imports = pe_machine_and_imports(path)
++    except (OSError, PEFormatError) as exc:
++        return False, str(exc)
++    if machine != expected_machine:
++        return False, (f"PE machine 0x{machine:04x} does not match "
++                       f"{arch_abi}")
++    bad_imports = sorted(imports & _POSIX_RUNTIMES)
++    if bad_imports:
++        return False, "disallowed POSIX runtime import(s): " + ", ".join(bad_imports)
++    return True, "ok"

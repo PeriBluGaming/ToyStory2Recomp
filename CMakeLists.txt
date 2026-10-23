@@ -53,9 +53,16 @@ psxrecomp_add_game_runtime(psx-runtime
     CODEGEN_SETUP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/codegen_setup.c"
 )
 
-# Toy Story 2: native skip-intro-mod
+# Toy Story 2 mods: native widescreen (16:9), Skip Startup Intro, and BIOS
+# free() compatibility for OpenBIOS.
 target_sources(psx-runtime PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/widescreen.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/skip_startup_intro.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/bios_free_compat.c"
+)
+
+target_include_directories(psx-runtime PRIVATE
+    "${PSXRECOMP_ROOT}/runtime/include"
 )
 
 # Stage runtime configs next to the exe for direct build/ launches. Only copy
