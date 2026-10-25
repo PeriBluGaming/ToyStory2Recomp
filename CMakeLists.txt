@@ -61,6 +61,7 @@ target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/bios_free_compat.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/infinite_lives.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/infinite_health.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/set_99_coins.c"
 )
 
 target_include_directories(psx-runtime PRIVATE

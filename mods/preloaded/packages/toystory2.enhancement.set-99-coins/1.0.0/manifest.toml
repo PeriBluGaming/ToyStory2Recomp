@@ -1,0 +1,22 @@
+format_version = 5
+id = "toystory2.enhancement.set-99-coins"
+version = "1.0.0"
+name = "99 Coins"
+author = "PeriBluGaming"
+description = "Sets Buzz's coin counter to 99 when collecting coins."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00893"
+
+[[feature]]
+id = "set-99-coins"
+name = "99 Coins"
+description = "Coin collection restores Buzz's coin counter to 99."
+group = "Gameplay"
+default_enabled = false
+
+[[plugin]]
+feature = "set-99-coins"
+id = "toystory2.set-99-coins"

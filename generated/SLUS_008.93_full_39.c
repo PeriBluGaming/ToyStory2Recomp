@@ -22402,6 +22402,7 @@ block_80076DAC:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x14u);
 #endif
+psx_mod_instruction(cpu, 0x80076DACu, 0xA4820000u);
     { uint32_t _pgxa = cpu->gpr[4]; g_debug_last_store_pc = 0x80076DACu; psx_store_cycle_barrier(); cpu->write_half(cpu->gpr[4], (uint16_t)cpu->gpr[2]);
     PGXP_STORE(0xA4820000u, _pgxa, cpu->gpr[2]); }  /* 0x80076DAC: 0xA4820000 */
 #ifdef PSX_COSIM
@@ -29136,6 +29137,7 @@ block_80076DAC:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x14u);
 #endif
+psx_mod_instruction(cpu, 0x80076DACu, 0xA4820000u);
     { uint32_t _pgxa = cpu->gpr[4]; g_debug_last_store_pc = 0x80076DACu; psx_store_cycle_barrier(); cpu->write_half(cpu->gpr[4], (uint16_t)cpu->gpr[2]);
     PGXP_STORE(0xA4820000u, _pgxa, cpu->gpr[2]); }  /* 0x80076DAC: 0xA4820000 */
 #ifdef PSX_COSIM
