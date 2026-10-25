@@ -59,6 +59,7 @@ target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/widescreen.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/skip_startup_intro.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/bios_free_compat.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/infinite_lives.c"
 )
 
 target_include_directories(psx-runtime PRIVATE

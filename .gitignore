@@ -91,3 +91,6 @@ starvation_dump.jsonl
 !/disc_probe.*.json
 !/disc_set.json
 !/.recomp.json
+
+# Local lives-counter RAM snapshots
+/lives_snaps/
