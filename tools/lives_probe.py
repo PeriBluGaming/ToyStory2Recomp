@@ -7,6 +7,7 @@ Never writes guest memory.
   lives_probe.py snap  NAME            save a 2 MB RAM snapshot to ./lives_snaps/NAME.bin
   lives_probe.py diff  --snaps a b c --expect 3 2 1 [--max-value 99]
                                        list 8/16/32-bit values matching expect[i] in snaps[i]
+  lives_probe.py changes OLD NEW       list changed aligned 8/16/32-bit values
   lives_probe.py trace ADDR [--width 1|2|4]
                                        arm a write trace for stores starting at ADDR
   lives_probe.py hits  ADDR [--width 1|2|4]
@@ -80,6 +81,38 @@ def cmd_diff(a):
             print(f"   ... {len(hits) - a.limit} more (raise --limit)")
 
 
+def cmd_changes(a):
+    old_data = open(snap_path(a.old), "rb").read()
+    new_data = open(snap_path(a.new), "rb").read()
+    if len(old_data) != RAM_SIZE or len(new_data) != RAM_SIZE:
+        sys.exit(f"snapshots must each contain exactly {RAM_SIZE} bytes")
+
+    for width, fmt in ((1, "B"), (2, "<H"), (4, "<I")):
+        changes = []
+        for off in range(0, RAM_SIZE - width + 1, width):
+            old = struct.unpack_from(fmt, old_data, off)[0]
+            new = struct.unpack_from(fmt, new_data, off)[0]
+            difference = new - old
+            if old == new:
+                continue
+            if a.decreases_only and difference >= 0:
+                continue
+            if max(old, new) > a.max_value:
+                continue
+            if abs(difference) < a.min_delta:
+                continue
+            changes.append((off, old, new, difference))
+
+        print(f"-- {width * 8}-bit changes: {len(changes)}")
+        for off, old, new, difference in changes[:a.limit]:
+            print(
+                f"   0x{RAM_BASE + off:08X}  "
+                f"{old} -> {new}  diff={difference:+d}"
+            )
+        if len(changes) > a.limit:
+            print(f"   ... {len(changes) - a.limit} more (raise --limit)")
+
+
 def phys(addr):
     return int(addr, 0) & 0x1FFFFFFF
 
@@ -126,6 +159,14 @@ def main():
     s.add_argument("--expect", nargs="+", type=int, required=True)
     s.add_argument("--limit", type=int, default=60)
     s.set_defaults(f=cmd_diff)
+    s = sub.add_parser("changes")
+    s.add_argument("old")
+    s.add_argument("new")
+    s.add_argument("--max-value", type=int, default=255)
+    s.add_argument("--min-delta", type=int, default=1)
+    s.add_argument("--decreases-only", action="store_true")
+    s.add_argument("--limit", type=int, default=100)
+    s.set_defaults(f=cmd_changes)
     s = sub.add_parser("trace")
     s.add_argument("addr")
     s.add_argument("--width", type=int, choices=(1, 2, 4), default=2)

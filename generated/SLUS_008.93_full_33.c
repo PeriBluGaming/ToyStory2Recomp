@@ -23000,6 +23000,7 @@ block_8006B14C:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0xAu);
 #endif
+psx_mod_instruction(cpu, 0x8006B18Cu, 0xA423221Eu);
     { uint32_t _pgxa = cpu->gpr[1] + 8734; g_debug_last_store_pc = 0x8006B18Cu; psx_store_cycle_barrier(); cpu->write_half(cpu->gpr[1] + 8734, (uint16_t)cpu->gpr[3]);
     PGXP_STORE(0xA423221Eu, _pgxa, cpu->gpr[3]); }  /* 0x8006B18C: 0xA423221E */
 #ifdef PSX_COSIM

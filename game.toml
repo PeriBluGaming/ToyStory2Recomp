@@ -37,7 +37,7 @@ strict = true
 # 0x80084FCC: widescreen mod (AddPrim, anchors HUD packets to the wide edges).
 # 0x80082E8C: BIOS free() compatibility mod (retail free() side effect, OpenBIOS hang).
 mod_function_entry_funcs = ["0x8007BC74", "0x80010000", "0x80084FCC", "0x80082E8C"]
-mod_instruction_sites = ["0x8007B060", "0x8007BE30"]
+mod_instruction_sites = ["0x8007B060", "0x8007BE30", "0x8006B18C"]
 
 [runtime]
 window_title = "ToyStory2 Recompiled"
