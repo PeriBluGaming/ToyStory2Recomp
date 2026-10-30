@@ -12,7 +12,7 @@ optional enhancements.
 [![GitHub release](https://img.shields.io/github/v/release/PeriBluGaming/ToyStory2Recomp)](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/latest)
 <!-- /retcomm-readme-metrics -->
 
-![Buzz Lightyear in Andy's room, running in ToyStory2Recomp](docs/ToyStory2Recomp.png)
+![Buzz Lightyear in Andy's room in 16:9 widescreen, running in ToyStory2Recomp](docs/ToyStory2Recomp.png)
 
 <sub>Screenshot of the original game running in ToyStory2Recomp. Game content
 belongs to its rights holders and is not covered by this project's
@@ -22,7 +22,7 @@ license.</sub>
 
 - **True 16:9 widescreen**: the 3D view is rendered wide, not stretched.
 - **Modern Camera**: orbit and tilt around Buzz with the right stick; R3
-  smoothly recenters behind him. *(On `main`; not in v0.4.0.)*
+  smoothly recenters behind him. *(Coming in v0.5.0; not in v0.4.0.)*
 - **Configurable camera**: separate turn and tilt sensitivity, adjustable
   deadzone and independent axis inversion.
 - **Skip Startup Intro**: straight to the *Press Start* screen.
@@ -58,28 +58,33 @@ compatibility fix. Details and options: [Enhancements](docs/enhancements.md).
 
 | Enhancement | What it does | Available in |
 |---|---|---|
-| **16:9 Widescreen** | Renders the 3D view natively wide instead of stretching it, anchors the HUD to the screen edges and extends the Level Select frame. The original 4:3 mode stays available. | v0.4.0 |
-| **Skip Startup Intro** | Skips the legal screens, ESRB screen and startup movies and goes straight to the *Press Start* screen. | v0.4.0 |
-| **Modern Camera** | Orbit and tilt the camera around Buzz with the right stick; the angle is kept until L2/R2 hand it back to the original Camera Mode. R3 recenters behind Buzz. | `main` only, not in v0.4.0 |
-| **BIOS free() Compatibility** | Always-on fix that lets the bundled OpenBIOS play past the Andy's House movie. Not a visual option. | v0.4.0 |
+| **16:9 Widescreen** | Renders the 3D view natively wide instead of stretching it, anchors the HUD to the screen edges and extends the Level Select frame. The original 4:3 mode stays available. | v0.4.0 and later |
+| **Skip Startup Intro** | Skips the legal screens, ESRB screen and startup movies and goes straight to the *Press Start* screen. | v0.4.0 and later |
+| **Modern Camera** | Orbit and tilt the camera around Buzz with the right stick; the angle is kept until L2/R2 hand it back to the original Camera Mode. R3 recenters behind Buzz. | v0.5.0 (upcoming) |
+| **BIOS free() Compatibility** | Always-on fix that lets the bundled OpenBIOS play past the Andy's House movie. Not a visual option. | v0.4.0 and later |
 
 > [!NOTE]
-> **Modern Camera is not part of the published v0.4.0 release.** It was merged
-> into `main` afterwards and is currently only available when
-> [building from source](docs/building.md).
+> **Modern Camera will ship with v0.5.0, which has not been published yet.**
+> The current release, v0.4.0, does not include it. Until v0.5.0 is out,
+> Modern Camera is available only when [building from source](docs/building.md).
 
 ## Download
 
 Get the latest version from the
 [Releases page](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/latest).
-Each release provides `toystory2-<version>-<platform>.zip`:
+The latest published release is **v0.4.0**; **v0.5.0** is in preparation and
+not yet available. Each release provides `toystory2-<version>-<platform>.zip`:
 
-| Platform | File suffix | Status (v0.4.0) |
-|---|---|---|
-| Windows x64 | `windows-x64` | Runtime-tested |
-| Linux x64 | `linux-x64` | Runtime-tested (Steam Deck) |
-| macOS Intel | `macos-x64` | Runtime-tested |
-| macOS Apple Silicon | `macos-arm64` | Built by CI, not runtime-tested |
+| Platform | File suffix | v0.4.0 (published) | v0.5.0 (upcoming) |
+|---|---|---|---|
+| Windows x64 | `windows-x64` | Runtime-tested | CI verified; runtime testing not confirmed |
+| Linux x64 | `linux-x64` | Runtime-tested (Steam Deck) | CI verified; runtime testing not confirmed |
+| macOS Intel | `macos-x64` | Runtime-tested | CI verified; **manually tested** on a real Intel Mac with all mods, including Modern Camera |
+| macOS Apple Silicon | `macos-arm64` | Built by CI, not runtime-tested | CI verified; runtime testing not confirmed |
+
+*CI verified* means the release zip was built, packaged and its contents
+checked automatically. *Manually tested* means the release build was played on
+real hardware.
 
 ## Quick start
 
@@ -128,10 +133,12 @@ separate hub for self-compiling recomps. More in
 
 - Native widescreen is verified in Andy's House and on Level Select; other
   levels may show culling gaps or misplaced HUD elements at the edges.
-- OpenBIOS compatibility was manually verified on macOS x64 only; macOS ARM64
-  is CI-built and has not been runtime-tested.
-- Savestates are tied to the exact build and widescreen setting; use the
-  in-game memory card for long-term progress.
+- Manual runtime testing of v0.5.0 is confirmed only for macOS x64; Windows,
+  Linux and macOS ARM64 builds are CI verified. The detailed OpenBIOS
+  coverage was performed on macOS x64 with v0.4.0.
+- Savestates are tied to the exact build and widescreen setting, so states
+  from v0.4.0 may not load in v0.5.0; use the in-game memory card for
+  long-term progress.
 
 See [Known limitations](docs/known-limitations.md) for the full list.
 
