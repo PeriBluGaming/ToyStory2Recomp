@@ -96,6 +96,13 @@ creating a GitHub release). CI builds the committed `generated/` C on Linux,
 Windows and macOS (Intel and Apple Silicon) and attaches
 `toystory2-<version>-<platform>.zip`, the compiled game.
 
+When run manually, the workflow takes the version from its `version` input
+(`X.Y.Z` or `vX.Y.Z`). If that is empty, it bumps the latest `vX.Y.Z` tag by
+the `bump` input (`patch` by default, or `minor`/`major`); the `VERSION` file
+is only a fallback when no tag exists. A release such as v0.5.0 therefore
+needs `version` set to `0.5.0`, or `bump` set to `minor`. The workflow refuses
+a version whose tag already exists.
+
 CI also verifies each zip: the expected game files are present, no build kit,
 disc, BIOS dump or developer mod state is included, and the license and
 notice files (`LICENSE`, `NOTICE.md`, `licenses/`, `bios/OpenBIOS.LICENSE`,
