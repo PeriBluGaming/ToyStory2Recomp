@@ -1,4 +1,10 @@
-# ToyStory2 Recompiled
+# ToyStory2Recomp
+
+**Relive the PlayStation classic. Recompiled for modern systems.**
+
+*Toy Story 2: Buzz Lightyear to the Rescue!* (PlayStation, 1999), statically
+recompiled into a native executable for Windows, Linux and macOS, with
+optional enhancements.
 
 <!-- retcomm-readme-metrics -->
 [![GitHub downloads (all assets, all releases)](https://img.shields.io/github/downloads/PeriBluGaming/ToyStory2Recomp/total)](https://github.com/PeriBluGaming/ToyStory2Recomp/releases)
@@ -6,211 +12,194 @@
 [![GitHub release](https://img.shields.io/github/v/release/PeriBluGaming/ToyStory2Recomp)](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/latest)
 <!-- /retcomm-readme-metrics -->
 
-Static recompilation of **ToyStory2** built on
-[psxrecomp](https://github.com/mstan/psxrecomp) and
-[recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui).
+![Buzz Lightyear in Andy's room, running in ToyStory2Recomp](docs/ToyStory2Recomp.png)
 
-Toy Story 2: Buzz Lightyear to the Rescue (USA, SLUS-00893) statically recompiled to a native PC executable with PSXRecomp.
-![ToyStory2Recomp](/docs/ToyStory2Recomp.png)
+<sub>Screenshot of the original game running in ToyStory2Recomp. Game content
+belongs to its rights holders and is not covered by this project's
+license.</sub>
+
+## Highlights
+
+- **True 16:9 widescreen**: the 3D view is rendered wide, not stretched.
+- **Modern Camera**: orbit and tilt around Buzz with the right stick; R3
+  smoothly recenters behind him. *(On `main`; not in v0.4.0.)*
+- **Configurable camera**: separate turn and tilt sensitivity, adjustable
+  deadzone and independent axis inversion.
+- **Skip Startup Intro**: straight to the *Press Start* screen.
+
+All enhancements are optional and can be switched on in the launcher.
+
+> [!IMPORTANT]
+> **You need your own copy of the game.** ToyStory2Recomp contains no disc
+> image and no retail BIOS. You supply a disc image of the USA release
+> (SLUS-00893).
+
+## About
+
+ToyStory2Recomp translates the game's original PlayStation code into C ahead
+of time and compiles it into a native program. It is built on
+[psxrecomp](https://github.com/mstan/psxrecomp), which provides the
+recompiler and the runtime that stands in for the PlayStation hardware, and
+[recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui), which provides
+the launcher. Game data is read from your own disc image.
 
 | | |
 |---|---|
+| Game | Toy Story 2: Buzz Lightyear to the Rescue! |
+| Region / serial | USA · SLUS-00893 |
+| Developer / publisher | Traveller's Tales / Activision |
+| Original release | 1999, PlayStation |
 | Players | 1 |
-| Region | USA |
-| Publisher | Activision, Traveller's Tales |
-| Year | 1999 |
 
-Scaffolded with the New Project Layout. See
-`psxrecomp/docs/GAME_PROJECT_SETUP.md` for the full flow.
+## Features
 
-<!-- retcomm-readme-launcher -->
-## Retro Launcher
+All enhancements are optional and off by default, except for a hidden
+compatibility fix. Details and options: [Enhancements](docs/enhancements.md).
 
-You can run this title **standalone** (download the release zip, point it at
-your disc, play), or manage installs, updates, and disc/BIOS wiring with
-**[Retro Launcher](https://github.com/RetroPortingToolKit/Retro-Launcher)** —
-the Retro Compilation Manager hub for self-compiling recomps.
+| Enhancement | What it does | Available in |
+|---|---|---|
+| **16:9 Widescreen** | Renders the 3D view natively wide instead of stretching it, anchors the HUD to the screen edges and extends the Level Select frame. The original 4:3 mode stays available. | v0.4.0 |
+| **Skip Startup Intro** | Skips the legal screens, ESRB screen and startup movies and goes straight to the *Press Start* screen. | v0.4.0 |
+| **Modern Camera** | Orbit and tilt the camera around Buzz with the right stick; the angle is kept until L2/R2 hand it back to the original Camera Mode. R3 recenters behind Buzz. | `main` only, not in v0.4.0 |
+| **BIOS free() Compatibility** | Always-on fix that lets the bundled OpenBIOS play past the Andy's House movie. Not a visual option. | v0.4.0 |
 
-[Downloads](https://github.com/RetroPortingToolKit/Retro-Launcher/releases) ·
-[Full README & features](https://github.com/RetroPortingToolKit/Retro-Launcher#readme)
+> [!NOTE]
+> **Modern Camera is not part of the published v0.4.0 release.** It was merged
+> into `main` afterwards and is currently only available when
+> [building from source](docs/building.md).
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/RetroPortingToolKit/Retro-Launcher/main/docs/screenshots/hub-and-game-launcher.png" alt="Retro hub with a background build, next to a title’s recomp-ui launcher" width="720">
-</p>
+## Download
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/RetroPortingToolKit/Retro-Launcher/main/docs/screenshots/queue-and-background-build.png" alt="Background cmake build with titles queued" width="720">
-</p>
+Get the latest version from the
+[Releases page](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/latest).
+Each release provides `toystory2-<version>-<platform>.zip`:
 
-Retro checks for updates, installs the prebuilt release zips, and automates
-BIOS/ROM/save plumbing so you are not stuck repeating each game’s first run by hand.
-<!-- /retcomm-readme-launcher -->
+| Platform | File suffix | Status (v0.4.0) |
+|---|---|---|
+| Windows x64 | `windows-x64` | Runtime-tested |
+| Linux x64 | `linux-x64` | Runtime-tested (Steam Deck) |
+| macOS Intel | `macos-x64` | Runtime-tested |
+| macOS Apple Silicon | `macos-arm64` | Built by CI, not runtime-tested |
 
-## Legal
+## Quick start
 
-You must own the original game. Disc images under `disc/` are gitignored and
-must never be committed. Retail BIOS dumps are not redistributed and no C
-derived from one may be committed. Releases bundle the MIT-licensed OpenBIOS; see the BIOS section for its current limitation.
+1. Download and unpack the zip for your platform.
+2. Start `ToyStory2_Recompiled`.
+3. On first run, select your disc image (`.cue`) of the **USA release,
+   SLUS-00893**; other regions are not supported. A BIOS is optional: the
+   open-source [OpenBIOS](docs/bios.md) is bundled.
+4. Optionally enable enhancements in the launcher's mod/enhancement settings.
 
-`generated/` (the recompiled game C) **is committed**: releases ship the
-compiled game, built by CI from that tree. Regenerate and commit it whenever
-seeds or the framework pin change.
+Recommended: **CD speed 4x or lower** (at 8x, *Exit Level* leaves the screen
+black). Widescreen needs the OpenGL renderer, which is the default.
 
-Default app icon: `assets/psxrecomp.ico` (and `.png` / `.svg`) — Retro-themed controller mark from `psxrecomp/assets/`. Windows builds embed it via `APP_ICON`.
+Full instructions: [Installation](docs/installation.md).
 
-Optional box art under `launcher_assets/img/` may come from
-[libretro-thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails)
-(`Named_Boxarts`); see `BOXART_SOURCE.txt` when present.
+## Mods and configuration
 
-## Features (v0.4.0)
+Enhancements are mod packages that ship with the game and are switched on and
+off in the launcher; they are listed in [Enhancements](docs/enhancements.md)
+with all options and defaults. The launcher also lists general enhancements
+from the psxrecomp framework, such as *CD Speed* or *PGXP Precision*.
+Additional `.psxmod` packages can be installed through the launcher's Mods
+manager.
 
-- **Native 16:9 widescreen** (mod feature *16:9 Widescreen*, off by default):
-  the 3D view is rendered natively wide rather than stretched, HUD elements are
-  anchored to the left and right screen edges, the pause menu stays centred,
-  and the Level Select Etch-A-Sketch frame is extended to the full width.
-  The original 4:3 rendering is unchanged when the feature is off.
-- **Skip Startup Intro** (mod feature, off by default): skips the legal and
-  logo screens and goes straight to the Press Start screen.
+## Optional: Retro Launcher
 
-Enable features in the launcher's mod/enhancement settings.
+<!-- Short replacement for the generated retcomm-readme-launcher block; see docs/retro-launcher.md before changing. -->
+You can play standalone from the release zip, or manage installs, updates and
+disc/BIOS setup with
+[Retro Launcher](https://github.com/RetroPortingToolKit/Retro-Launcher), a
+separate hub for self-compiling recomps. More in
+[Retro Launcher](docs/retro-launcher.md).
 
-## Installation
+## Documentation
 
-1. Download `toystory2-<version>-<platform>.zip` from the Releases page and
-   unpack it.
-2. Start `ToyStory2_Recompiled`. On first run the setup wizard asks for your
-   game disc image (`.cue`) and, optionally, a BIOS. You must supply your own
-   legally obtained disc of *Toy Story 2: Buzz Lightyear to the Rescue!* (USA,
-   SLUS-00893). No disc image or retail BIOS is included.
-3. Enable *16:9 Widescreen* in the enhancements menu if wanted.
-
-## BIOS
-
-Releases bundle **OpenBIOS** (MIT licence). Retail BIOS images are never
-distributed.
-
-> **OpenBIOS compatibility (v0.4.0):** the game calls the BIOS `free()`
-> (A0:34h) on a pointer inside its own memory pool (not a BIOS `malloc`
-> block). Retail SCPH-1001 `free()` only sets bit 0 of the word before the
-> pointer; OpenBIOS instead walks a free list through game-overwritten
-> memory and never returns, which showed as a black screen after the Andy's
-> House movie. The bundled, always-on `bios-free-compat` mod reproduces the
-> retail behaviour for this call. Manually tested on **OpenBIOS, macOS x64**:
-> the first-run wizard, Andy's House gameplay after the movie, multiple
-> levels and transitions, exiting/re-entering the level, savestates across a
-> full restart, memory-card functionality, widescreen 16:9 and classic 4:3.
-> A diagnostic run recorded 24 accepted compatibility-hook calls, zero
-> pass-through calls, and only the four previously identified return
-> addresses; every write set only bit 0 of the preceding word. This is
-> targeted manual coverage, not full-game or cross-platform validation.
->
-> **Platform test status (v0.4.0):** the game has been runtime-tested on
-> Windows x64, Linux (Steam Deck) and macOS Intel. macOS ARM64 is built by CI
-> but has **not been runtime-tested**. The detailed OpenBIOS coverage above was
-> performed on macOS x64 only.
-
-### Using a retail SCPH-1001 (workaround)
-
-Release zips bundle a toolchain that builds a BIOS backend from **your own**
-SCPH-1001 dump (CRC32 `37157331`, 512 KiB, v2.2) on first use. Tested with
-the macOS x64 package only; other platforms are untested for this workaround.
-A C compiler must be available on `PATH` on macOS and Linux (Xcode Command
-Line Tools, or `gcc`/`clang`); on Windows the bundled toolchain selects a
-native MinGW-w64 GCC and rejects Cygwin/MSYS compilers, but preparing a
-retail BIOS backend on Windows has not been tested.
-
-1. Unzip the release and run `ToyStory2_Recompiled`.
-2. In the launcher, select your disc image, then open the **BIOS** setting
-   and pick your `SCPH1001.BIN`. The file is only referenced, never copied.
-3. The launcher shows "Prepare it once for this build (about a minute)".
-   Click **Prepare** and wait for it to finish.
-4. Press **Play**. The backend is cached under `cache/bios/` beside the
-   executable and reused on later launches.
-
-Other retail images (SCPH-5500/5501/5552/101) have build profiles but are
-untested. The generated BIOS code is a local cache; never redistribute it.
-
-## Recommended settings
-
-- **CD speed 4x or lower.** At 8x, *Exit Level* leaves the screen black.
-- Widescreen needs the OpenGL renderer (the default).
+| Page | Contents |
+|---|---|
+| [Installation](docs/installation.md) | Requirements, platforms, first run, recommended settings |
+| [Enhancements](docs/enhancements.md) | Every enhancement, its options and defaults |
+| [BIOS](docs/bios.md) | OpenBIOS compatibility, retail SCPH-1001 workaround |
+| [Known limitations](docs/known-limitations.md) | Tested scope, widescreen caveats, savestates |
+| [Building from source](docs/building.md) | Patches, build, regeneration, symbols, releases |
+| [Retro Launcher](docs/retro-launcher.md) | Optional launcher integration |
 
 ## Known limitations
 
-- OpenBIOS compatibility was manually verified across multiple levels on
-  macOS x64 (see above); not every level or platform has been tested.
-- macOS ARM64 is CI-built only and has not been runtime-tested.
-- Native widescreen is verified in Andy's House and the Level Select screen;
-  other levels have not been fully tested and may show culling gaps or
-  misplaced HUD elements at the screen edges.
-- The Level Select frame side fillers are reconstructed from the original frame
-  textures; small differences at the extreme edges are possible.
+- Native widescreen is verified in Andy's House and on Level Select; other
+  levels may show culling gaps or misplaced HUD elements at the edges.
+- OpenBIOS compatibility was manually verified on macOS x64 only; macOS ARM64
+  is CI-built and has not been runtime-tested.
+- Savestates are tied to the exact build and widescreen setting; use the
+  in-game memory card for long-term progress.
 
-## Savestates
-
-- Savestates are tied to the exact build: they record a hash of the
-  recompiled game code and a memory-layout value, and a state that does not
-  match is rejected. **Savestates from earlier builds (v0.3.x and development
-  builds) may therefore not load in v0.4.0**; we have not tested them
-  one by one.
-- With *16:9 Widescreen* enabled, the mod reserves a small amount of GPU-DMA
-  memory at start-up, which changes the memory layout. States saved with
-  widescreen on and off may be incompatible with each other (not tested).
-  Within one setting, states saved before and after visiting Level Select
-  load correctly (tested, SCPH-1001 build).
-- Use the in-game memory card for long-term progress; savestates are for
-  convenience and may not survive future updates.
+See [Known limitations](docs/known-limitations.md) for the full list.
 
 ## Building from source
 
-The pinned `psxrecomp` submodule (`7cddab82`) is used with **two versioned
-patches**, applied in order:
-
-1. `patches/psxrecomp-screen-x-interp.patch` makes the dirty-RAM interpreter
-   honour `[widescreen.cull] screen_x_sites`.
-2. `patches/psxrecomp-windows-toolchain.patch` makes Windows runtime overlay/BIOS
-   compilation require a native (non-Cygwin/MSYS) compiler and rejects
-   incompatible cached DLLs before they are loaded.
-
-Apply them after checkout and before configuring:
+These commands build the executable from the recompiled game C that is
+already committed in `generated/`; no disc is needed for this step.
 
 ```bash
 git submodule update --init --recursive
-bash tools/apply_psxrecomp_patch.sh   # idempotent; verifies the pin and the patches
-```
-
-CI does this automatically. Do not bump `psxrecomp` without regenerating the
-patches (the script refuses to run on a different base commit).
-
-## Quick start (dev)
-
-```bash
-git submodule update --init --recursive
+bash tools/apply_psxrecomp_patch.sh
 ./psxrecomp/tools/ci/build_emitters.sh
-python3 psxrecomp/psxrecomp_cli.py generate \
-  --config game.toml --project-root . --disc disc/<your>.cue
-git add generated && git commit -m "Regenerate game C"
 cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release --target psx-runtime
 ```
 
-Releases: tag `vX.Y.Z` (or run the *Release builds* workflow). CI builds the
-committed `generated/` C on Linux, Windows and macOS and attaches
-`toystory2-<version>-<platform>.zip`, the compiled game. Locally:
-`scripts/package_release.sh build-release linux-x64`.
+The pinned psxrecomp submodule needs two versioned patches, which the script
+above applies. The complete development workflow, including regenerating the
+game C from your disc, symbols, framework pins and releases, is described in
+[Building from source](docs/building.md).
 
-## Symbols
+## Credits
 
-Progressive map: `symbols.toml` → `python3 tools/sync_symbols.py` →
-`psx_symbols.h` (`PSX_FN_*`). See `psxrecomp/docs/SYMBOLS.md`.
+- **[PeriBluGaming](https://github.com/PeriBluGaming)**: author and
+  maintainer of ToyStory2Recomp, including the widescreen, Modern Camera,
+  Skip Startup Intro and OpenBIOS compatibility mods, the psxrecomp patches
+  and the release setup.
+- **Matthew Stanley**: [psxrecomp](https://github.com/mstan/psxrecomp) and
+  [recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui), which this
+  project is built on.
+- **The PCSX-Redux authors**: [OpenBIOS](https://github.com/grumpycoders/pcsx-redux),
+  bundled with releases (MIT).
+- The authors of the further components listed in psxrecomp's and recomp-ui's
+  third-party notices, which ship in every release under `licenses/`.
+- *Toy Story 2: Buzz Lightyear to the Rescue!* was developed by Traveller's
+  Tales and published by Activision; the game and its characters belong to
+  their respective rights holders.
 
-## Framework pins
+## License
 
-Submodule gitlinks (`psxrecomp`, optional `recomp-ui`, nested `recomp-net`)
-are authoritative. `framework_pins.txt` is an optional scaffold snapshot;
-release CI logs SHAs with `record_pins.sh` but builds whatever the gitlinks
-resolve to. Bump submodules deliberately — do not float on `main`/`master`
-in release CI.
+ToyStory2Recomp's original code, such as the mods in `mods/src/`, their
+manifests and `tools/apply_psxrecomp_patch.sh`, is © 2026 PeriBluGaming and
+licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may
+use, modify and share it for noncommercial purposes, provided the license
+terms and its `Required Notice` lines are kept. No license for commercial use
+is granted.
+
+This license does **not** cover:
+
+- **The game.** `generated/` and the compiled game in release builds are
+  machine-translated from the original game's code, which belongs to its
+  rights holders. No license to it is granted here.
+- **Game artwork**, including the screenshot above.
+- **[psxrecomp](https://github.com/mstan/psxrecomp)** (PolyForm Noncommercial
+  1.0.0, © Matthew Stanley), including the files in `patches/` and the project
+  files generated from its templates.
+- **[recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui)** (MIT,
+  © Matthew Stanley) and all other bundled third-party components.
+
+[NOTICE.md](NOTICE.md) lists the terms for every part of the repository.
+
+## Disclaimer
+
+ToyStory2Recomp is an unofficial fan project. It is not affiliated with,
+endorsed, sponsored or approved by Disney, Pixar, Activision, Traveller's
+Tales or Sony Interactive Entertainment. All names, characters and trademarks
+belong to their respective owners. You need your own legally obtained copy of
+the game to play.
 
 <!-- retcomm-readme-raid -->
 ---
