@@ -13,7 +13,7 @@ game_id = "SLUS-00893"
 [[feature]]
 id = "modern-camera"
 name = "Modern Camera"
-description = "Right stick left/right orbits the camera around Buzz, up/down raises or lowers it. The chosen angle is kept until you press L2/R2, which hand the camera back to the selected Camera Mode (Active or Passive). Scripted cameras are not affected."
+description = "Right stick left/right orbits the camera around Buzz, up/down raises or lowers it. Click the right stick (R3) to swing the camera back behind Buzz. The chosen angle is kept until you press L2/R2, which hand the camera back to the selected Camera Mode (Active or Passive). Scripted cameras are not affected."
 group = "Gameplay"
 default_enabled = false
 
@@ -70,6 +70,15 @@ description = "Off: stick up looks up (the camera moves down). On: stick up move
 group = "Gameplay"
 type = "boolean"
 default = "false"
+
+[[option]]
+feature = "modern-camera"
+id = "r3_recenter"
+label = "R3 Camera Recenter"
+description = "Click the right stick (R3) to swing the camera behind Buzz within 0.4 seconds. Moving the right stick cancels it. Select + R3 stays the Rewind shortcut."
+group = "Gameplay"
+type = "boolean"
+default = "true"
 
 [[plugin]]
 feature = "modern-camera"
