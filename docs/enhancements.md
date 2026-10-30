@@ -10,7 +10,7 @@ Enable the optional ones in the launcher's mod/enhancement settings.
 |---|---|---|
 | [16:9 Widescreen](#169-widescreen) | Off | v0.4.0 and later |
 | [Skip Startup Intro](#skip-startup-intro) | Off | v0.4.0 and later |
-| [Modern Camera](#modern-camera) | Off | v0.5.0 (upcoming); not in v0.4.0 |
+| [Modern Camera](#modern-camera) | Off | v0.5.0 and later |
 | [BIOS free() Compatibility](#bios-free-compatibility) | Always on (hidden) | v0.4.0 and later |
 
 The launcher also lists general enhancements that come with the psxrecomp
@@ -57,10 +57,9 @@ For shorter loading you can additionally enable psxrecomp's separate
 
 Package `toystory2.enhancement.modern-camera`, feature *Modern Camera*.
 
-> **Availability:** Modern Camera was merged into `main` after v0.4.0 and will
-> ship with **v0.5.0**, which has not been published yet. It is **not** part of
-> the published v0.4.0 release. Until v0.5.0 is out, it is only available when
-> [building from source](building.md).
+> **Availability:** Modern Camera is included starting with
+> [v0.5.0](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/tag/v0.5.0).
+> It is **not** part of v0.4.0 or earlier releases.
 
 The right analog stick controls the follow camera around Buzz, like in a
 modern 3D platformer:

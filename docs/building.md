@@ -99,8 +99,9 @@ Windows and macOS (Intel and Apple Silicon) and attaches
 When run manually, the workflow takes the version from its `version` input
 (`X.Y.Z` or `vX.Y.Z`). If that is empty, it bumps the latest `vX.Y.Z` tag by
 the `bump` input (`patch` by default, or `minor`/`major`); the `VERSION` file
-is only a fallback when no tag exists. A release such as v0.5.0 therefore
-needs `version` set to `0.5.0`, or `bump` set to `minor`. The workflow refuses
+is only a fallback when no tag exists. A minor release after v0.5.0, for
+example, needs `version` set to `0.6.0`, or `bump` set to `minor`. The
+workflow refuses
 a version whose tag already exists.
 
 CI also verifies each zip: the expected game files are present, no build kit,
