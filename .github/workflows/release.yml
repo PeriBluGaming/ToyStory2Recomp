@@ -631,6 +631,42 @@ jobs:
             echo "::error::release zip lacks ${BIOS_FREE_MANIFEST} (OpenBIOS free() compatibility mod)" >&2
             exit 1
           fi
+          # 1c. License and notice files: this project's LICENSE and NOTICE.md
+          #     at the root, the upstream and third-party notices beside them.
+          MISSING=0
+          for must in 'LICENSE' 'NOTICE.md' 'licenses/psxrecomp-LICENSE' 'licenses/THIRD_PARTY_ATTRIBUTION.md' \
+                      'licenses/recomp-ui-LICENSE' 'bios/OpenBIOS.LICENSE' 'assets/fonts/NOTICE.md' 'assets/img/NOTICE.md'; do
+            if ! grep -qxF "${must}" <<<"${LIST}"; then
+              echo "::error::release zip lacks license/notice file ${must}" >&2
+              MISSING=1
+            fi
+          done
+          [[ "${MISSING}" -eq 0 ]] || exit 1
+          # The project LICENSE carries the PeriBluGaming Required Notice and,
+          # from its title on, the official PolyForm Noncommercial 1.0.0 text
+          # (SHA-256 of polyformproject/polyform-licenses@1.0.0). CRs are
+          # stripped first: a Windows checkout may convert line endings.
+          POLYFORM_NC_SHA256='c0ea4a896d2c8c394b29f9427589996db826cd501c512279ff0ed3ef48fabbe5'
+          sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1; else shasum -a 256 | cut -d' ' -f1; fi; }
+          PKG_LICENSE="$(mktemp)"; PKG_PSXRECOMP_LICENSE="$(mktemp)"
+          unzip -p "${ZIP}" LICENSE | tr -d '\r' >"${PKG_LICENSE}"
+          if ! grep -qxF 'Required Notice: Copyright (c) 2026 PeriBluGaming' "${PKG_LICENSE}"; then
+            echo "::error::packaged LICENSE lacks the PeriBluGaming Required Notice" >&2
+            exit 1
+          fi
+          BODY_SHA256="$(sed -n '/^# PolyForm Noncommercial License 1.0.0$/,$p' "${PKG_LICENSE}" | sha256)"
+          if [[ "${BODY_SHA256}" != "${POLYFORM_NC_SHA256}" ]]; then
+            echo "::error::packaged LICENSE is not the complete, unmodified PolyForm Noncommercial 1.0.0 text (sha256 ${BODY_SHA256})" >&2
+            exit 1
+          fi
+          # psxrecomp's license ships byte-identical to the pinned submodule.
+          unzip -p "${ZIP}" licenses/psxrecomp-LICENSE >"${PKG_PSXRECOMP_LICENSE}"
+          if ! cmp -s "${PKG_PSXRECOMP_LICENSE}" psxrecomp/LICENSE; then
+            echo "::error::licenses/psxrecomp-LICENSE differs from the pinned psxrecomp/LICENSE" >&2
+            exit 1
+          fi
+          rm -f "${PKG_LICENSE}" "${PKG_PSXRECOMP_LICENSE}"
+          echo "license and notice files ok"
           # 2. It is NOT a build kit: no framework tree, no CLI, no emitters at
           #    the root, no sources, no generated C.
           for never in '^psxrecomp/' '^recomp-ui/' '^psxrecomp_cli.py' '^psxrecomp-game' '^psxrecomp-bios' \

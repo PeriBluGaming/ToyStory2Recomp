@@ -104,7 +104,8 @@ the game, the disc or the build. PeriBluGaming claims no copyright in them.
 Source archives downloaded from GitHub do not contain submodule files. Fetch
 them with `git submodule update --init --recursive`.
 
-Release packages carry the upstream notices: `licenses/` holds psxrecomp's
+Release ZIP archives ship this project's `LICENSE` and this `NOTICE.md` at
+their root. They also carry the upstream notices: `licenses/` holds psxrecomp's
 license (`psxrecomp-LICENSE`), its third-party attribution and notices, and
 recomp-ui's license; `bios/OpenBIOS.LICENSE`, `assets/fonts/NOTICE.md` and
 `assets/img/NOTICE.md` sit beside the files they cover. The executable
