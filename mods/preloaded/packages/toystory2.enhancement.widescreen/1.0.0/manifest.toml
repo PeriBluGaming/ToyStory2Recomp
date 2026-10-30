@@ -3,6 +3,7 @@ id = "toystory2.enhancement.widescreen"
 version = "1.0.0"
 name = "Widescreen 16:9"
 author = "PeriBluGaming"
+license = "PolyForm-Noncommercial-1.0.0"
 description = "Native 16:9 widescreen for Toy Story 2: widened gameplay view, HUD anchored to the screen edges, and an extended Level Select frame."
 resolver = "declarative"
 save_compatibility = "shared"
@@ -13,7 +14,7 @@ game_id = "*"
 [[feature]]
 id = "widescreen"
 name = "16:9 Widescreen"
-description = "Renders the game natively in 16:9. Use CD speed 4x or lower; the SCPH-1001 BIOS is currently recommended (see README)."
+description = "Renders the game natively in 16:9. Use CD speed 4x or lower. Compatible with the bundled OpenBIOS."
 group = "Visual"
 default_enabled = false
 

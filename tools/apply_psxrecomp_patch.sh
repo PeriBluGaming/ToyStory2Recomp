@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# SPDX-FileCopyrightText: 2026 PeriBluGaming
 # Apply the versioned patch series in patches/ to the psxrecomp submodule:
 #   1. psxrecomp-screen-x-interp.patch      dirty-RAM interpreter honours
 #                                           [widescreen.cull] screen_x_sites

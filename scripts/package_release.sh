@@ -41,6 +41,10 @@ else
   EXTRA+=(--ship-without-overlay-cache-because \
     "no disc at package time: the committed static AOT shard is compiled in and overlay_toolchain/ autocompiles the rest on the player's machine")
 fi
+# This project's own license and per-path notice ship at the zip root. Passed
+# unconditionally: the packager fails if either is missing. Upstream licenses
+# and third-party notices are staged by the packager into licenses/.
+EXTRA+=(--doc LICENSE --doc NOTICE.md)
 # Extra docs shipped at the zip root (DISC.md tells players which dump works).
 for _doc in DISC.md; do
   if [[ -f "${ROOT}/${_doc}" ]]; then
