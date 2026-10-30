@@ -309,6 +309,7 @@ void func_80067440(CPUState* cpu)
         }
     }
     debug_server_log_call_entry(0x80067440u);
+    if (psx_mod_function_entry(cpu, 0x80067440u)) return;  /* trusted opt-in game-mod hook */
     /* Address: 0x80067440, Size: 6636 bytes, Blocks: 296 */
 
 block_80067440:
@@ -2073,6 +2074,7 @@ block_8006767C:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x4u);
 #endif
+psx_mod_instruction(cpu, 0x80067688u, 0x30420040u);
     { uint32_t _pgx1 = cpu->gpr[2]; cpu->gpr[2] = cpu->gpr[2] & 0x0040;
     PGXP_ALU(0x30420040u, cpu->gpr[2], _pgx1, 0x0040u); }  /* 0x80067688: 0x30420040 */
 #ifdef PSX_COSIM
@@ -3748,6 +3750,7 @@ block_8006788C:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x4u);
 #endif
+psx_mod_instruction(cpu, 0x80067898u, 0x30420040u);
     { uint32_t _pgx1 = cpu->gpr[2]; cpu->gpr[2] = cpu->gpr[2] & 0x0040;
     PGXP_ALU(0x30420040u, cpu->gpr[2], _pgx1, 0x0040u); }  /* 0x80067898: 0x30420040 */
 #ifdef PSX_COSIM
@@ -7569,6 +7572,7 @@ block_80067DDC:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x4u);
 #endif
+psx_mod_instruction(cpu, 0x80067DE8u, 0x30420040u);
     { uint32_t _pgx1 = cpu->gpr[2]; cpu->gpr[2] = cpu->gpr[2] & 0x0040;
     PGXP_ALU(0x30420040u, cpu->gpr[2], _pgx1, 0x0040u); }  /* 0x80067DE8: 0x30420040 */
 #ifdef PSX_COSIM
@@ -13717,6 +13721,7 @@ block_800685E0:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x4u);
 #endif
+psx_mod_instruction(cpu, 0x800685E8u, 0x3042000Cu);
     { uint32_t _pgx1 = cpu->gpr[2]; cpu->gpr[2] = cpu->gpr[2] & 0x000C;
     PGXP_ALU(0x3042000Cu, cpu->gpr[2], _pgx1, 0x000Cu); }  /* 0x800685E8: 0x3042000C */
 #ifdef PSX_COSIM
@@ -22168,6 +22173,7 @@ block_800685E0:
 #ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x4u);
 #endif
+psx_mod_instruction(cpu, 0x800685E8u, 0x3042000Cu);
     { uint32_t _pgx1 = cpu->gpr[2]; cpu->gpr[2] = cpu->gpr[2] & 0x000C;
     PGXP_ALU(0x3042000Cu, cpu->gpr[2], _pgx1, 0x000Cu); }  /* 0x800685E8: 0x3042000C */
 #ifdef PSX_COSIM

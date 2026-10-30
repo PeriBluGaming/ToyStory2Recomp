@@ -36,7 +36,14 @@ strict = true
 # 0x80010000: widescreen mod (SetClipRect, widens the full-screen X clip).
 # 0x80084FCC: widescreen mod (AddPrim, anchors HUD packets to the wide edges).
 # 0x80082E8C: BIOS free() compatibility mod (retail free() side effect, OpenBIOS hang).
-mod_function_entry_funcs = ["0x8007BC74", "0x80010000", "0x80084FCC", "0x80082E8C"]
+# 0x80067440: Modern Camera mod (follow-camera target update, orbit yaw).
+mod_function_entry_funcs = ["0x8007BC74", "0x80010000", "0x80084FCC", "0x80082E8C", "0x80067440"]
+# Modern Camera mod: the three `andi $v0,$v0,0x40` reads of the Camera Mode
+# bit (0x800C160C) inside 0x80067440. The mod masks the bit in the register
+# only, so the stored Active/Passive setting in RAM is never written.
+# 0x800685E8: `andi $v0,$v0,0xC` before the walking camera's return of the
+# elevation to 64; the mod returns it to the player's chosen elevation instead.
+mod_instruction_sites = ["0x80067688", "0x80067898", "0x80067DE8", "0x800685E8"]
 
 [runtime]
 window_title = "ToyStory2 Recompiled"

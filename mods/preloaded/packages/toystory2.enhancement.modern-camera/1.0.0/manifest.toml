@@ -1,0 +1,76 @@
+format_version = 5
+id = "toystory2.enhancement.modern-camera"
+version = "1.0.0"
+name = "Modern Camera"
+author = "PeriBluGaming"
+description = "Move the camera around Buzz with the right analog stick, like a modern 3D platformer. The game's own camera collision and look-at stay in charge."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00893"
+
+[[feature]]
+id = "modern-camera"
+name = "Modern Camera"
+description = "Right stick left/right orbits the camera around Buzz, up/down raises or lowers it. The chosen angle is kept until you press L2/R2, which hand the camera back to the selected Camera Mode (Active or Passive). Scripted cameras are not affected."
+group = "Gameplay"
+default_enabled = false
+
+[[option]]
+feature = "modern-camera"
+id = "speed"
+label = "Turn speed (degrees per second)"
+description = "Camera turn rate at full stick deflection."
+group = "Gameplay"
+type = "integer"
+min = 30
+max = 360
+step = 10
+default = 120
+
+[[option]]
+feature = "modern-camera"
+id = "vspeed"
+label = "Tilt speed (degrees per second)"
+description = "Camera raise/lower rate at full stick deflection."
+group = "Gameplay"
+type = "integer"
+min = 10
+max = 180
+step = 10
+default = 60
+
+[[option]]
+feature = "modern-camera"
+id = "deadzone"
+label = "Right stick deadzone (%)"
+description = "Stick travel ignored around the centre, on top of the controller deadzone."
+group = "Gameplay"
+type = "integer"
+min = 0
+max = 50
+step = 1
+default = 15
+
+[[option]]
+feature = "modern-camera"
+id = "invert_x"
+label = "Invert horizontal"
+description = "Swap the turn direction of the right stick."
+group = "Gameplay"
+type = "boolean"
+default = "false"
+
+[[option]]
+feature = "modern-camera"
+id = "invert_y"
+label = "Invert vertical"
+description = "Off: stick up looks up (the camera moves down). On: stick up moves the camera up."
+group = "Gameplay"
+type = "boolean"
+default = "false"
+
+[[plugin]]
+feature = "modern-camera"
+id = "toystory2.modern-camera"
