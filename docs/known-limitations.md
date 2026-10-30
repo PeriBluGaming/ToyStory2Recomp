@@ -11,8 +11,8 @@
 - **macOS Apple Silicon (ARM64):** built and package-checked by CI for v0.4.0
   and v0.5.0. v0.4.0 was not runtime-tested on it; runtime testing of v0.5.0
   has not been confirmed.
-- **v0.5.0 testing (upcoming, not yet published):** the v0.5.0 build passed
-  CI verification (build, packaging and zip check) on all four platforms.
+- **v0.5.0 testing:** the v0.5.0 release builds passed CI verification
+  (build, packaging and zip check) on all four platforms.
   Manual runtime testing is
   confirmed for **macOS x64 only**: the build artifact was played on a real
   Intel Mac, and all included mods worked, including Modern Camera. Runtime
@@ -51,8 +51,7 @@
 
 ## Modern Camera
 
-- Not included in the published v0.4.0 release. It will ship with v0.5.0;
-  until then it is only available when [building from source](building.md).
+- Available starting with v0.5.0; not included in v0.4.0 or earlier releases.
 - The camera's chosen angle is not stored in savestates: after loading a
   state, the original camera behaviour applies until the stick or R3 is used
   again.

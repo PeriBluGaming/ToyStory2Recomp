@@ -13,10 +13,10 @@
 ## Supported platforms
 
 Every release provides one zip per platform, named
-`toystory2-<version>-<platform>.zip`. The latest published release is
-**v0.4.0**; **v0.5.0** is in preparation and not yet available.
+`toystory2-<version>-<platform>.zip`. The latest release is
+**[v0.5.0](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/tag/v0.5.0)**.
 
-| Platform | Release file | v0.4.0 (published) | v0.5.0 (upcoming) |
+| Platform | Release file | v0.4.0 | v0.5.0 (latest) |
 |---|---|---|---|
 | Windows x64 | `toystory2-<version>-windows-x64.zip` | Runtime-tested | CI verified; runtime testing not confirmed |
 | Linux x64 | `toystory2-<version>-linux-x64.zip` | Runtime-tested (Steam Deck) | CI verified; runtime testing not confirmed |
