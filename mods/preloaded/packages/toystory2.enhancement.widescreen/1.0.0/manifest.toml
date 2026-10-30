@@ -14,7 +14,7 @@ game_id = "*"
 [[feature]]
 id = "widescreen"
 name = "16:9 Widescreen"
-description = "Renders the game natively in 16:9. Use CD speed 4x or lower; the SCPH-1001 BIOS is currently recommended (see README)."
+description = "Renders the game natively in 16:9. Use CD speed 4x or lower. Compatible with the bundled OpenBIOS."
 group = "Visual"
 default_enabled = false
 
