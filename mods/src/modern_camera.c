@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+ * SPDX-FileCopyrightText: 2026 PeriBluGaming */
 #include <stdint.h>
 #include <stdlib.h>
 
