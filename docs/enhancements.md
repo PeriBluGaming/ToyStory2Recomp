@@ -96,7 +96,7 @@ modern 3D platformer:
 Package `toystory2.enhancement.progress-tracker`, feature
 *Progress Tracker*.
 
-> **Availability:** Progress Tracker is not part of v0.5.0 or earlier
+> **Availability:** Progress Tracker is part of v0.6.0 or later
 > releases. It is planned for the next release.
 
 Adds a second page to the pause menu that shows your Pizza Planet Token
