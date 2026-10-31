@@ -25,6 +25,7 @@ license.</sub>
   smoothly recenters behind him. *(New in v0.5.0.)*
 - **Configurable camera**: separate turn and tilt sensitivity, adjustable
   deadzone and independent axis inversion.
+- **Progress Tracker**: second Pause-Menu with the current level's Pizza Planet Token progress
 - **Skip Startup Intro**: straight to the *Press Start* screen.
 
 All enhancements are optional and can be switched on in the launcher.
