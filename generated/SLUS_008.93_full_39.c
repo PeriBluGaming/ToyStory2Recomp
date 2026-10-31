@@ -3336,7 +3336,8 @@ block_80075394:
 #ifdef PSX_COSIM
     cosim_instr(0x80075398u);
 #endif
-    #ifdef PSX_ENABLE_BLOCK_CYCLES
+    psx_mod_instruction(cpu, 0x8007539Cu, 0x104000F7u);
+#ifdef PSX_ENABLE_BLOCK_CYCLES
     psx_cyc_step(cpu, 0x5u);
 #endif
     int _bc_8007539C = (cpu->gpr[2] == cpu->gpr[0]);  /* save branch cond before delay slot */
