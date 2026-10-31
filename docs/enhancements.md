@@ -11,7 +11,7 @@ Enable the optional ones in the launcher's mod/enhancement settings.
 | [16:9 Widescreen](#169-widescreen) | Off | v0.4.0 and later |
 | [Skip Startup Intro](#skip-startup-intro) | Off | v0.4.0 and later |
 | [Modern Camera](#modern-camera) | Off | v0.5.0 and later |
-| [Progress Tracker](#progress-tracker) | Off | Next release (not in v0.5.0) |
+| [Progress Tracker](#progress-tracker) | Off | v0.6.0 |
 | [BIOS free() Compatibility](#bios-free-compatibility) | Always on (hidden) | v0.4.0 and later |
 
 The launcher also lists general enhancements that come with the psxrecomp
