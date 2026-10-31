@@ -61,7 +61,7 @@ compatibility fix. Details and options: [Enhancements](docs/enhancements.md).
 | **16:9 Widescreen** | Renders the 3D view natively wide instead of stretching it, anchors the HUD to the screen edges and extends the Level Select frame. The original 4:3 mode stays available. | v0.4.0 and later |
 | **Skip Startup Intro** | Skips the legal screens, ESRB screen and startup movies and goes straight to the *Press Start* screen. | v0.4.0 and later |
 | **Modern Camera** | Orbit and tilt the camera around Buzz with the right stick; the angle is kept until L2/R2 hand it back to the original Camera Mode. R3 recenters behind Buzz. | v0.5.0 and later |
-| **Progress Tracker** | Adds a second pause-menu page (D-pad Right) with the current level's Pizza Planet Token progress: five level-specific objectives with checkboxes, and boss status on boss levels. See [Progress Tracker](docs/enhancements.md#progress-tracker). | Next release (not in v0.5.0) |
+| **Progress Tracker** | Adds a second pause-menu page (D-pad Right) with the current level's Pizza Planet Token progress: five level-specific objectives with checkboxes, and boss status on boss levels. See [Progress Tracker](docs/enhancements.md#progress-tracker). | v0.6.0 and later |
 | **BIOS free() Compatibility** | Always-on fix that lets the bundled OpenBIOS play past the Andy's House movie. Not a visual option. | v0.4.0 and later |
 
 > [!NOTE]
