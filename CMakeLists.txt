@@ -54,12 +54,14 @@ psxrecomp_add_game_runtime(psx-runtime
 )
 
 # Toy Story 2 mods: native widescreen (16:9), Skip Startup Intro, BIOS
-# free() compatibility for OpenBIOS, and the right-stick Modern Camera.
+# free() compatibility for OpenBIOS, the right-stick Modern Camera, and the
+# pause-menu Progress Tracker
 target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/widescreen.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/skip_startup_intro.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/bios_free_compat.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/modern_camera.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/progress_tracker.c"
 )
 
 target_include_directories(psx-runtime PRIVATE

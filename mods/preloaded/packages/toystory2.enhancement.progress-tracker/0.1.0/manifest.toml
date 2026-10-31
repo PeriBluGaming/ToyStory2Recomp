@@ -1,0 +1,23 @@
+format_version = 5
+id = "toystory2.enhancement.progress-tracker"
+version = "0.1.0"
+name = "Progress Tracker"
+author = "PeriBluGaming"
+license = "PolyForm-Noncommercial-1.0.0"
+description = "Adds a Level Progress page to the original pause menu: live Pizza Planet Token progress for the current level with its five level-specific objectives, and boss status on boss levels. Press Right on the main pause page to open it; Left or Triangle returns, Start continues."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00893"
+
+[[feature]]
+id = "progress-tracker"
+name = "Progress Tracker"
+description = "Adds a second page to the original pause menu, with page dots below the menu. D-Pad Right on the main pause page opens Level Progress; D-Pad Left or Triangle returns; Start continues the game. The page shows the level name, the number of Pizza Planet Tokens collected (out of 5) and a checkbox for each of the level's five objectives, described for that level (for example Find 5 Sheep or Race R.C. Car). Boss levels show whether the boss has been defeated. Progress is read live from the game and includes tokens not yet saved to a memory card. The original pause menu, its cursor and settings are unchanged."
+group = "Gameplay"
+default_enabled = false
+
+[[plugin]]
+feature = "progress-tracker"
+id = "toystory2.progress-tracker"

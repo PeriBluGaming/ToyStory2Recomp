@@ -2,8 +2,8 @@
 
 [← Back to README](../README.md)
 
-ToyStory2Recomp bundles four mod packages. Three are optional enhancements
-that are **off by default**; the fourth is an always-on compatibility fix.
+ToyStory2Recomp bundles five mod packages. Four are optional enhancements
+that are **off by default**; the fifth is an always-on compatibility fix.
 Enable the optional ones in the launcher's mod/enhancement settings.
 
 | Enhancement | Default | Available in |
@@ -11,6 +11,7 @@ Enable the optional ones in the launcher's mod/enhancement settings.
 | [16:9 Widescreen](#169-widescreen) | Off | v0.4.0 and later |
 | [Skip Startup Intro](#skip-startup-intro) | Off | v0.4.0 and later |
 | [Modern Camera](#modern-camera) | Off | v0.5.0 and later |
+| [Progress Tracker](#progress-tracker) | Off | Next release (not in v0.5.0) |
 | [BIOS free() Compatibility](#bios-free-compatibility) | Always on (hidden) | v0.4.0 and later |
 
 The launcher also lists general enhancements that come with the psxrecomp
@@ -89,6 +90,67 @@ modern 3D platformer:
 | Invert horizontal | Off | Swaps the turn direction |
 | Invert vertical | Off | Off: stick up looks up. On: stick up moves the camera up |
 | R3 Camera Recenter | On | Turn off to disable R3 recentering |
+
+## Progress Tracker
+
+Package `toystory2.enhancement.progress-tracker`, feature
+*Progress Tracker*.
+
+> **Availability:** Progress Tracker is not part of v0.5.0 or earlier
+> releases. It is planned for the next release.
+
+Adds a second page to the pause menu that shows your Pizza Planet Token
+progress for the current level.
+
+![Level Progress page for Andy's House with all five tokens collected](progress-tracker-level.png)
+
+- The page shows the **level name**, how many of the level's five tokens you
+  have collected (for example `3 / 5 TOKENS`), and one row per token with a
+  **checkbox**.
+- The five rows describe that level's own objectives, always in the same
+  order: Hamm's 50 coins, the lost-items quest, the race or challenge, the
+  secret or puzzle token, and the mini-boss. In Andy's House, for example:
+  *50 coins for Hamm*, *find 5 sheep*, *race R.C. car*, *push shelf boxes*,
+  *defeat Tin Robot*.
+- Progress is live: a token shows as collected as soon as you pick it up, even
+  before you save to a memory card.
+- Boss levels have no tokens. They show **BOSS DEFEATED** once the boss has
+  been beaten, and **BOSS NOT DEFEATED** before that.
+
+![Level Progress page for the Final Showdown boss level after the boss was defeated](progress-tracker-boss.png)
+
+### Navigation
+
+Two small page dots below the pause menu show which page is active.
+
+![Original pause menu with the two page dots below it](progress-tracker-pause-menu.png)
+
+| Button | On the original pause menu | On the Level Progress page |
+|---|---|---|
+| D-pad **Right** | Opens Level Progress | – |
+| D-pad **Left** or **Triangle** | Original behaviour | Back to the pause menu |
+| **Start** | Continues the game | Continues the game |
+
+- The game stays paused while you switch pages. The original pause menu, its
+  cursor and its settings are unchanged.
+- **Right** only switches pages on the main pause page. In *Camera Mode* and
+  *Volume Control* the D-pad keeps its original function.
+- The tracker only reads the game's progress; it never changes it.
+- Turning the enhancement off restores the original pause menu without page
+  dots. After loading a savestate the pause menu opens on its first page.
+
+Requirements and caveats:
+
+- Works in the original 4:3 mode and with the
+  [16:9 Widescreen](#169-widescreen) enhancement; the panel stays centred.
+- The page uses the game's own font, so all text is shown in its capital
+  letters.
+- The objective names are short descriptions written for this enhancement,
+  based on the game's own hint texts.
+- Tested during a full playthrough of the game, including the final level and
+  the ending, together with Widescreen, Modern Camera and Skip Startup Intro.
+  Not every combination of settings, controllers and platforms has been
+  tested.
 
 ## BIOS free() Compatibility
 
