@@ -261,6 +261,83 @@ static void widescreen_hud_savestate(void)
     hud_track_reset();
 }
 
+/* Front-end overlay text (Issue #24). The overlay's centred-text routine
+ * 0x800E1984(str, y, centre) draws each character as its own packet: a
+ * 16 px SPRT (AddPrim at 0x800E1E40) or, for the button icons 0xB2/0xB3/
+ * 0xB9/0xBA while *0x800A14B4 != 0, a 22 px quad (AddPrim at 0x800E1D1C,
+ * 10 px extra advance at 0x800E1D40); every character, drawn or not,
+ * advances 13 px (0x800E1E58). Classified one by one, long Level Select
+ * names (18+ characters) lost their outer letters to the edge groups. At
+ * either AddPrim the routine's registers describe the whole string: s7 =
+ * start (after an optional '^' colour prefix), s5 = length, s3 = current
+ * character, s2 = its x. The string's drawn extent decides one group for
+ * all of its packets, with the same thresholds; strings that lie inside a
+ * group keep it (the right-hand select/back prompts, for example). */
+#define TS2_FE_TEXT_RA_GLYPH   0x800E1E48u
+#define TS2_FE_TEXT_RA_ICON    0x800E1D24u
+#define TS2_FE_TEXT_JAL_ICON   0x800E1D1Cu
+#define TS2_FE_TEXT_ICON_STEP  0x800E1D40u
+#define TS2_FE_TEXT_STEP       0x800E1E58u
+#define TS2_ADDIU_S2_10        0x2652000Au
+#define TS2_ADDIU_S2_13        0x2652000Du
+#define TS2_FE_ICON_SCALE      0x800A14B4u
+#define TS2_FE_TEXT_MAX_LEN    64u
+
+static int ts2_fe_text_icon(uint32_t c)
+{
+    return c == 0xB2u || c == 0xB3u || c == 0xB9u || c == 0xBAu;
+}
+
+/* Characters with a glyph in the routine's jump table (0x800D6144). */
+static int ts2_fe_text_drawn(uint32_t c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+           c == '\'' || c == '.' || c == '?' || c == '!' || c == '\\' || c == '/' ||
+           ts2_fe_text_icon(c);
+}
+
+static int ts2_fe_string_edge(const struct CPUState* cpu, int* edge)
+{
+    uint32_t ra = cpu->gpr[31];
+    if (ra != TS2_FE_TEXT_RA_GLYPH && ra != TS2_FE_TEXT_RA_ICON)
+        return 0;
+    if (psx_mod_read_word(TS2_FE_TEXT_JAL_ICON) != TS2_JAL_ADD_PRIM ||
+        psx_mod_read_word(TS2_FE_TEXT_ICON_STEP) != TS2_ADDIU_S2_10 ||
+        psx_mod_read_word(TS2_FE_TEXT_STEP) != TS2_ADDIU_S2_13)
+        return 0;
+
+    uint32_t start = cpu->gpr[23], len = cpu->gpr[21], cur = cpu->gpr[19];
+    if (len == 0u || len > TS2_FE_TEXT_MAX_LEN || cur < start || cur - start >= len ||
+        !ts2_fe_text_drawn(psx_mod_read_byte(cur)))
+        return 0;
+
+    int32_t icon_extra = psx_mod_read_word(TS2_FE_ICON_SCALE) != 0u ? 10 : 0;
+    int32_t pos = 0, cur_pos = 0, lo = 0, hi = 0;
+    int drawn = 0;
+    for (uint32_t i = 0; i < len; ++i) {
+        uint32_t c = psx_mod_read_byte(start + i);
+        int quad = icon_extra && ts2_fe_text_icon(c);
+        if (start + i == cur)
+            cur_pos = pos;
+        if (ts2_fe_text_drawn(c)) {
+            int32_t end = pos + (quad ? 22 : 16);
+            if (!drawn || pos < lo) lo = pos;
+            if (!drawn || end > hi) hi = end;
+            drawn = 1;
+        }
+        pos += 13 + (quad ? icon_extra : 0);
+    }
+
+    int32_t origin = (int32_t)cpu->gpr[18] - cur_pos;
+    if (origin + hi < TS2_LS_LEFT_GROUP_MAX)
+        *edge = -1;
+    else if (origin + lo >= TS2_LS_RIGHT_GROUP_MIN)
+        *edge = 1;
+    else
+        *edge = 0;
+    return 1;
+}
+
 static int level_select_filter(struct CPUState* cpu)
 {
     uint32_t prim = cpu->gpr[5];
@@ -289,6 +366,8 @@ static int level_select_filter(struct CPUState* cpu)
         }
         else if (xmin == 384)
             edge = 1;
+    } else if (ts2_fe_string_edge(cpu, &edge)) {
+        /* one group for the whole string */
     } else if (xmax < TS2_LS_LEFT_GROUP_MAX) {
         edge = -1;
     } else if (xmin >= TS2_LS_RIGHT_GROUP_MIN) {
