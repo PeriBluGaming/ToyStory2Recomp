@@ -40,7 +40,10 @@ strict = true
 # 0x800742C4: Progress Tracker mod (pause-menu input handler, page switching).
 # 0x80074DEC: Progress Tracker mod (HUD slot helper; its call right after the
 #             pause-menu block, ra 0x80075784, draws the Progress page).
-mod_function_entry_funcs = ["0x8007BC74", "0x80010000", "0x80084FCC", "0x80082E8C", "0x80067440", "0x800742C4", "0x80074DEC"]
+# 0x80086054: widescreen mod (DrawOTag, groups this frame's HUD packets by OT).
+# 0x80087A70: widescreen mod (libgpu exec(ot) that starts the GPU linked-list
+#             DMA, now or deferred by addque2; renews those HUD anchor tags).
+mod_function_entry_funcs = ["0x8007BC74", "0x80010000", "0x80084FCC", "0x80082E8C", "0x80067440", "0x800742C4", "0x80074DEC", "0x80086054", "0x80087A70"]
 # Modern Camera mod: the three `andi $v0,$v0,0x40` reads of the Camera Mode
 # bit (0x800C160C) inside 0x80067440. The mod masks the bit in the register
 # only, so the stored Active/Passive setting in RAM is never written.

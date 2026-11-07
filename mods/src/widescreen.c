@@ -107,6 +107,160 @@ static void ls_insert_filler(uint32_t ot_slot)
     psx_mod_write_word(ot_slot, (head & 0xFF000000u) | (node & 0x00FFFFFFu));
 }
 
+/* HUD anchor refresh (Issue #22). The runtime honours an anchor tag for two
+ * VBlanks after it was set, but the game builds the HUD (0x80074F80) before
+ * the world and the reverse OT reaches slot 175 near the end of the DMA walk,
+ * so a slow game frame (3+ VBlanks) let every HUD tag expire and the whole HUD
+ * drew at its 4:3 position for that frame.
+ *
+ * Each tagged packet is remembered with its classification and contents.
+ * DrawOTag (0x80086054, called from the frame end at 0x8003A950) seals them
+ * into a batch keyed by its OT pointer. libgpu's addque2 starts the transfer
+ * through 0x80087A70 (exec(ot): D2_MADR = ot, CHCR = 0x01000401) either at
+ * once or, while the GPU is busy, later from the DMA-complete callback; on
+ * that entry the matching batch is tagged again, right before the walk. A
+ * packet is refreshed only if its length and every word still match what was
+ * classified, so reused memory never inherits a stale edge. Classification is
+ * unchanged; this only renews the tags' timestamps. */
+#define TS2_DRAW_OTAG    0x80086054u
+#define TS2_GPU_OT_KICK  0x80087A70u
+#define HUD_TRACK_MAX    512u      /* gameplay HUD ~11/frame; menus and text more */
+#define HUD_TRACK_WORDS  12u       /* longest GP0 packet the runtime tags */
+
+typedef struct {
+    uint32_t prim;
+    int8_t edge;
+    uint8_t len;
+    uint32_t words[HUD_TRACK_WORDS];
+} hud_track_t;
+typedef struct {
+    uint32_t ot;        /* DrawOTag argument; 0 while open */
+    uint32_t ot_base;   /* *0x800A1468 when the entries were recorded */
+    unsigned count;
+    hud_track_t e[HUD_TRACK_MAX];
+} hud_batch_t;
+/* One open batch (being built) and two sealed ones awaiting their transfer:
+ * addque2 may still hold the previous frame's OT when the next is sealed. */
+static hud_batch_t hud_buf[3];
+static unsigned hud_open = 0;
+static unsigned hud_sealed[2] = { 1u, 2u };   /* [0] older, [1] newer */
+
+static void hud_track_reset(void)
+{
+    for (unsigned i = 0; i < 3u; ++i) {
+        hud_buf[i].ot = 0;
+        hud_buf[i].ot_base = 0;
+        hud_buf[i].count = 0;
+    }
+}
+
+static void hud_anchor(uint32_t prim, int edge)
+{
+    psx_mod_anchor_hud_primitive(prim, edge);
+
+    /* Entries left from an OT that never reached DrawOTag belong to an older
+     * frame: drop them instead of carrying them into this one. */
+    hud_batch_t* b = &hud_buf[hud_open];
+    uint32_t base = psx_mod_read_word(TS2_OT_BASE_PTR);
+    if (b->count && base != b->ot_base)
+        b->count = 0;
+    b->ot_base = base;
+
+    uint32_t len = psx_mod_read_byte(prim + 3u);
+    if (len == 0u || len > HUD_TRACK_WORDS || b->count >= HUD_TRACK_MAX) {
+        psx_mod_counter_add("toystory2.ws-hud.track_skipped", 1u);
+        return;
+    }
+    hud_track_t* t = &b->e[b->count++];
+    t->prim = prim;
+    t->edge = (int8_t)(edge < 0 ? -1 : edge > 0 ? 1 : 0);
+    t->len = (uint8_t)len;
+    for (uint32_t i = 0; i < len; ++i)
+        t->words[i] = psx_mod_read_word(prim + 4u + 4u * i);
+}
+
+static int hud_track_unchanged(const hud_track_t* t)
+{
+    if (psx_mod_read_byte(t->prim + 3u) != t->len)
+        return 0;
+    for (uint32_t i = 0; i < t->len; ++i)
+        if (psx_mod_read_word(t->prim + 4u + 4u * i) != t->words[i])
+            return 0;
+    return 1;
+}
+
+static int widescreen_active_for_hud(void)
+{
+    return psx_mod_widescreen_x_margin() > 0 && psx_mod_display_width() == TS2_SCREEN_WIDTH;
+}
+
+/* DrawOTag(ot): seal the open batch under this OT pointer. */
+static int widescreen_hud_seal_filter(struct CPUState* cpu, uint32_t address)
+{
+    (void)address;
+    if (!widescreen_active_for_hud()) {
+        hud_track_reset();
+        return 0;
+    }
+    uint32_t ot = cpu->gpr[4];
+    for (unsigned i = 0; i < 2u; ++i)
+        if (hud_buf[hud_sealed[i]].ot == ot)   /* resubmitted before its kick */
+            hud_buf[hud_sealed[i]].count = 0;
+    if (hud_buf[hud_open].count == 0u)
+        return 0;
+    unsigned victim = hud_sealed[0];          /* oldest sealed batch is dropped */
+    hud_sealed[0] = hud_sealed[1];
+    hud_sealed[1] = hud_open;
+    hud_buf[hud_open].ot = ot;
+    hud_open = victim;
+    hud_buf[victim].ot = 0;
+    hud_buf[victim].ot_base = 0;
+    hud_buf[victim].count = 0;
+    return 0;
+}
+
+/* exec(ot) at 0x80087A70: the transfer of this OT starts now. */
+static int widescreen_hud_kick_filter(struct CPUState* cpu, uint32_t address)
+{
+    (void)address;
+    if (!widescreen_active_for_hud()) {
+        hud_track_reset();
+        return 0;
+    }
+    uint32_t ot = cpu->gpr[4];
+    for (unsigned s = 0; s < 2u; ++s) {
+        hud_batch_t* b = &hud_buf[hud_sealed[s]];
+        if (b->ot != ot || b->count == 0u)
+            continue;
+        uint32_t refreshed = 0, changed = 0;
+        for (unsigned i = 0; i < b->count; ++i) {
+            if (hud_track_unchanged(&b->e[i])) {
+                psx_mod_anchor_hud_primitive(b->e[i].prim, b->e[i].edge);
+                ++refreshed;
+            } else {
+                ++changed;
+            }
+        }
+        if (refreshed)
+            psx_mod_counter_add("toystory2.ws-hud.refreshed", refreshed);
+        if (changed)
+            psx_mod_counter_add("toystory2.ws-hud.refresh_changed", changed);
+        /* The game swaps OT buffers right after DrawOTag returns, so a kick
+         * that sees the other buffer was deferred by addque2. */
+        if (psx_mod_read_word(TS2_OT_BASE_PTR) != b->ot_base)
+            psx_mod_counter_add("toystory2.ws-hud.kick_deferred", 1u);
+        b->ot = 0;
+        b->count = 0;
+    }
+    return 0;
+}
+
+static void widescreen_hud_savestate(void)
+{
+    /* Restored guest memory need not hold the packets recorded before. */
+    hud_track_reset();
+}
+
 static int level_select_filter(struct CPUState* cpu)
 {
     uint32_t prim = cpu->gpr[5];
@@ -140,7 +294,7 @@ static int level_select_filter(struct CPUState* cpu)
     } else if (xmin >= TS2_LS_RIGHT_GROUP_MIN) {
         edge = 1;
     }
-    psx_mod_anchor_hud_primitive(prim, edge);
+    hud_anchor(prim, edge);
     return 0;
 }
 
@@ -184,7 +338,7 @@ static int widescreen_hud_filter(struct CPUState* cpu, uint32_t address)
         edge = -1;
     else if (xmin > TS2_RIGHT_EDGE_MIN)
         edge = 1;
-    psx_mod_anchor_hud_primitive(prim, edge);
+    hud_anchor(prim, edge);
     return 0;
 }
 
@@ -192,6 +346,7 @@ static void widescreen_activate(void)
 {
     (void)psx_mod_set_fixed_display_aspect(16, 9);
     ls_alloc_filler();
+    hud_track_reset();
 }
 
 PSX_MOD_CONSTRUCTOR(register_widescreen)
@@ -207,4 +362,10 @@ PSX_MOD_CONSTRUCTOR(register_widescreen)
     );
     (void)psx_mod_register_function_filter_plugin(
         "toystory2.ws-hud-anchor", TS2_ADD_PRIM, widescreen_hud_filter);
+    (void)psx_mod_register_function_filter_plugin(
+        "toystory2.ws-hud-anchor", TS2_DRAW_OTAG, widescreen_hud_seal_filter);
+    (void)psx_mod_register_function_filter_plugin(
+        "toystory2.ws-hud-anchor", TS2_GPU_OT_KICK, widescreen_hud_kick_filter);
+    (void)psx_mod_register_savestate_plugin(
+        "toystory2.ws-hud-anchor", widescreen_hud_savestate);
 }
