@@ -298,6 +298,53 @@ static int level_select_filter(struct CPUState* cpu)
     return 0;
 }
 
+/* Dialogue and message boxes (Issue #23). The NPC dialogue box (drawn inline
+ * in 0x80063AC8, x 20..494 when open) and the box helper 0x80063954 (pause
+ * box; "you have collected a token!" box, x 77..435) each draw two 2 px
+ * vertical bars, two full-width bars and a fill as separate sprites through
+ * 0x8004676C. Classified one by one, the vertical bars fell beyond the edge
+ * thresholds and moved outward while the rest of the box stayed centred; the
+ * dialogue's inline button icons (0x80045DD8 via 0x80064058) could do the
+ * same. AddPrim is a leaf, so at its entry $sp is still the builder's frame:
+ * 0x8004676C saves $ra at 68($sp) (0x800467C0) and 0x80045DD8 at 64($sp)
+ * (0x80045E10), both straight-line before any AddPrim call, and neither
+ * changes $sp again until its epilogue, after the AddPrim. When that saved
+ * caller is one of these verified box or dialogue sites, the part stays
+ * centred with the box. Every other caller keeps its classification. */
+#define TS2_QUAD_2C_SAVED_RA 68u
+#define TS2_QUAD_2D_SAVED_RA 64u
+static const uint32_t ts2_box_sprite_sites[] = {
+    0x800639C8u, 0x800639FCu, 0x80063A2Cu, 0x80063A60u, 0x80063A94u, /* 0x80063954 */
+    0x80063F54u, 0x80063F88u, 0x80063FB8u, 0x80063FECu, 0x80064024u, /* dialogue box */
+};
+static const uint32_t ts2_dialogue_icon_sites[] = {
+    0x80063D84u,                /* "continue" prompt below the dialogue text */
+    0x800640B0u, 0x800640D8u,   /* inline '@' (X) and '~' (Triangle) icons */
+};
+
+static int ts2_centred_box_part(const struct CPUState* cpu, uint32_t ra)
+{
+    const uint32_t* sites;
+    unsigned count;
+    uint32_t slot;
+    if (ra == TS2_HUD_RA_QUAD_2C) {
+        sites = ts2_box_sprite_sites;
+        count = sizeof ts2_box_sprite_sites / sizeof ts2_box_sprite_sites[0];
+        slot = TS2_QUAD_2C_SAVED_RA;
+    } else if (ra == TS2_HUD_RA_QUAD_2D) {
+        sites = ts2_dialogue_icon_sites;
+        count = sizeof ts2_dialogue_icon_sites / sizeof ts2_dialogue_icon_sites[0];
+        slot = TS2_QUAD_2D_SAVED_RA;
+    } else {
+        return 0;
+    }
+    uint32_t caller = psx_mod_read_word(cpu->gpr[29] + slot);
+    for (unsigned i = 0; i < count; ++i)
+        if (caller == sites[i])
+            return 1;
+    return 0;
+}
+
 static int widescreen_hud_filter(struct CPUState* cpu, uint32_t address)
 {
     (void)address;
@@ -338,6 +385,8 @@ static int widescreen_hud_filter(struct CPUState* cpu, uint32_t address)
         edge = -1;
     else if (xmin > TS2_RIGHT_EDGE_MIN)
         edge = 1;
+    if (edge && ts2_centred_box_part(cpu, ra))
+        edge = 0;
     hud_anchor(prim, edge);
     return 0;
 }
