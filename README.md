@@ -25,7 +25,7 @@ license.</sub>
   smoothly recenters behind him. *(New in v0.5.0.)*
 - **Configurable camera**: separate turn and tilt sensitivity, adjustable
   deadzone and independent axis inversion.
-- **Progress Tracker**: second Pause-Menu with the current level's Pizza Planet Token progress
+- **Progress Tracker**: second Pause-Menu with the current level's Pizza Planet Token progress.
 - **Skip Startup Intro**: straight to the *Press Start* screen.
 
 All enhancements are optional and can be switched on in the launcher.
@@ -59,7 +59,7 @@ compatibility fix. Details and options: [Enhancements](docs/enhancements.md).
 
 | Enhancement | What it does | Available in |
 |---|---|---|
-| **16:9 Widescreen** | Renders the 3D view natively wide instead of stretching it, anchors the HUD to the screen edges and extends the Level Select frame. The original 4:3 mode stays available. | v0.4.0 and later |
+| **16:9 Widescreen** | Renders the 3D view natively wide instead of stretching it, anchors the HUD to the screen edges and extends the Level Select frame. The original 4:3 mode stays available. v0.6.1 fixes intermittent HUD jumping, off-centre dialogue box borders and misaligned Level Select text. | v0.4.0 and later |
 | **Skip Startup Intro** | Skips the legal screens, ESRB screen and startup movies and goes straight to the *Press Start* screen. | v0.4.0 and later |
 | **Modern Camera** | Orbit and tilt the camera around Buzz with the right stick; the angle is kept until L2/R2 hand it back to the original Camera Mode. R3 recenters behind Buzz. | v0.5.0 and later |
 | **Progress Tracker** | Adds a second pause-menu page (D-pad Right) with the current level's Pizza Planet Token progress: five level-specific objectives with checkboxes, and boss status on boss levels. See [Progress Tracker](docs/enhancements.md#progress-tracker). | v0.6.0 and later |
@@ -75,15 +75,15 @@ compatibility fix. Details and options: [Enhancements](docs/enhancements.md).
 Get the latest version from the
 [Releases page](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/latest).
 The latest release is
-**[v0.5.0](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/tag/v0.5.0)**.
+**[v0.6.1](https://github.com/PeriBluGaming/ToyStory2Recomp/releases/tag/v0.6.1)**.
 Each release provides `toystory2-<version>-<platform>.zip`:
 
-| Platform | File suffix | v0.4.0 | v0.5.0 (latest) |
-|---|---|---|---|
-| Windows x64 | `windows-x64` | Runtime-tested | CI verified; runtime testing not confirmed |
-| Linux x64 | `linux-x64` | Runtime-tested (Steam Deck) | CI verified; runtime testing not confirmed |
-| macOS Intel | `macos-x64` | Runtime-tested | CI verified; **manually tested** on a real Intel Mac with all mods, including Modern Camera |
-| macOS Apple Silicon | `macos-arm64` | Built by CI, not runtime-tested | CI verified; runtime testing not confirmed |
+| Platform | File suffix | v0.4.0 | v0.5.0 | v0.6.1 (latest) |
+|---|---|---|---|---|
+| Windows x64 | `windows-x64` | Runtime-tested | CI verified; runtime testing not confirmed | CI verified; runtime testing not confirmed |
+| Linux x64 | `linux-x64` | Runtime-tested (Steam Deck) | CI verified; runtime testing not confirmed | CI verified; runtime testing not confirmed |
+| macOS Intel | `macos-x64` | Runtime-tested | CI verified; **manually tested** on a real Intel Mac with all mods, including Modern Camera | CI verified; **manually tested** with the official release zip on a real Intel Mac |
+| macOS Apple Silicon | `macos-arm64` | Built by CI, not runtime-tested | CI verified; runtime testing not confirmed | CI verified; runtime testing not confirmed |
 
 *CI verified* means the release zip was built, packaged and its contents
 checked automatically. *Manually tested* means the release build was played on
@@ -136,12 +136,15 @@ separate hub for self-compiling recomps. More in
 
 - Native widescreen is verified in Andy's House and on Level Select; other
   levels may show culling gaps or misplaced HUD elements at the edges.
-- Manual runtime testing of v0.5.0 is confirmed only for macOS x64; Windows,
-  Linux and macOS ARM64 builds are CI verified. The detailed OpenBIOS
+- All four v0.6.1 release builds are CI verified. Manual runtime testing of
+  the official v0.6.1 release zip is confirmed for macOS x64 (real Intel Mac);
+  Windows, Linux and macOS ARM64 builds are CI verified only. For v0.5.0,
+  manual runtime testing is confirmed only for macOS x64. The detailed OpenBIOS
   coverage was performed on macOS x64 with v0.4.0.
-- Savestates are tied to the exact build and widescreen setting, so states
-  from v0.4.0 may not load in v0.5.0; use the in-game memory card for
-  long-term progress.
+- Savestates are tied to the exact build and widescreen setting. The
+  recompiled game code changed in v0.6.1 (new widescreen hooks), so states
+  from v0.6.0 may not load in v0.6.1, just as v0.4.0 states may not load in
+  v0.5.0; use the in-game memory card for long-term progress.
 
 See [Known limitations](docs/known-limitations.md) for the full list.
 
