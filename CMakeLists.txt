@@ -54,14 +54,18 @@ psxrecomp_add_game_runtime(psx-runtime
 )
 
 # Toy Story 2 mods: native widescreen (16:9), Skip Startup Intro, BIOS
-# free() compatibility for OpenBIOS, the right-stick Modern Camera, and the
-# pause-menu Progress Tracker
+# free() compatibility for OpenBIOS, the right-stick Modern Camera, the
+# pause-menu Progress Tracker, and the Cheat Menu prototype (developer
+# channel; its in-game menu provider builds on recomp-ui's runtime menu and
+# Dear ImGui, already compiled into this target)
 target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/widescreen.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/skip_startup_intro.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/bios_free_compat.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/modern_camera.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/progress_tracker.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_plugin.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_provider.cpp"
 )
 
 target_include_directories(psx-runtime PRIVATE

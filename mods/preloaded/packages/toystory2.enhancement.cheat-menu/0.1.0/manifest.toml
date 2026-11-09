@@ -1,0 +1,24 @@
+format_version = 6
+id = "toystory2.enhancement.cheat-menu"
+version = "0.1.0"
+name = "Cheat Menu"
+author = "PeriBluGaming"
+license = "PolyForm-Noncommercial-1.0.0"
+description = "Prototype of an in-game Cheat Menu overlay. It contains no cheats yet and never changes the game."
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "SLUS-00893"
+
+[[feature]]
+id = "cheat-menu"
+name = "Cheat Menu (prototype)"
+description = "Opens an in-game overlay with F10 or Select + L3 on a controller. The game and its audio pause while it is open, and the game receives no input from it. The prototype has only a Resume Game action; it contains no cheats and never changes the game. The F7 save-state menu is unavailable while the overlay is open."
+group = "Gameplay"
+channel = "developer"
+default_enabled = false
+
+[[plugin]]
+feature = "cheat-menu"
+id = "toystory2.cheat-menu"
