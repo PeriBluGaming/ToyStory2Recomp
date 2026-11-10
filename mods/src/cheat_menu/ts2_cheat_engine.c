@@ -11,6 +11,12 @@
 typedef struct ts2_cheat_engine {
     int ready;
     int enabled;
+    /* 1 after a failed run disabled the cheat; cleared only by an explicit
+     * set_enabled() call, never by the engine itself. */
+    int error;
+    /* 1 once a run completed since the cheat was last (re-)enabled or the
+     * guest state was restored: ARMED vs ACTIVE. */
+    int applied_since_enable;
     psxcheat_program program;
     psxcheat_psx_adapter adapter;
     ts2_cheat_engine_stats stats;
@@ -58,8 +64,31 @@ ts2_cheat_engine_stats ts2_cheat_engine_get_stats(void) { return g_engine.stats;
 int ts2_cheat_engine_set_enabled(int enabled)
 {
     if (!g_engine.ready) return 0;
+    /* An explicit choice acknowledges a previous error: enabling re-arms
+     * (the next eligible VBlank runs again), disabling just switches off. */
+    g_engine.error = 0;
+    g_engine.applied_since_enable = 0;
     g_engine.enabled = enabled != 0;
     return 1;
+}
+
+ts2_cheat_state ts2_cheat_engine_state(void)
+{
+    if (!g_engine.ready) return TS2_CHEAT_UNAVAILABLE;
+    if (!g_engine.enabled) return g_engine.error ? TS2_CHEAT_ERROR : TS2_CHEAT_OFF;
+    return g_engine.applied_since_enable ? TS2_CHEAT_ACTIVE : TS2_CHEAT_ARMED;
+}
+
+const char *ts2_cheat_state_name(ts2_cheat_state state)
+{
+    switch (state) {
+    case TS2_CHEAT_UNAVAILABLE: return "unavailable";
+    case TS2_CHEAT_OFF: return "off";
+    case TS2_CHEAT_ARMED: return "armed";
+    case TS2_CHEAT_ACTIVE: return "active";
+    case TS2_CHEAT_ERROR: return "error";
+    }
+    return "unknown";
 }
 
 void ts2_cheat_engine_vblank(void)
@@ -74,6 +103,7 @@ void ts2_cheat_engine_vblank(void)
      * adapter would refuse the span and the run would count as a failure. */
     if (!psx_mod_game_started()) {
         ++g_engine.stats.not_started;
+        g_engine.applied_since_enable = 0;  /* waiting: ARMED, not ACTIVE */
         return;
     }
     if (!psxcheat_psx_begin(&g_engine.adapter)) {
@@ -87,10 +117,14 @@ void ts2_cheat_engine_vblank(void)
     g_engine.stats.last_status = st;
     if (st == PSXCHEAT_OK) {
         ++g_engine.stats.applied;
+        g_engine.applied_since_enable = 1;
     } else {
-        /* Fail safe: stop writing until explicitly re-enabled. */
+        /* Fail closed: stop writing and show the error until the cheat is
+         * explicitly re-enabled; never re-enabled automatically. */
         ++g_engine.stats.failures;
         g_engine.enabled = 0;
+        g_engine.error = 1;
+        g_engine.applied_since_enable = 0;
     }
 }
 
@@ -98,6 +132,8 @@ void ts2_cheat_engine_savestate(void)
 {
     /* The restored guest RAM is authoritative; nothing is written here. The
      * enabled state is host state and is kept, so an enabled cheat applies
-     * again at the next VBlank. */
+     * again at the next VBlank; until then it reports ARMED, because the
+     * restored RAM may not hold the cheat's value. An error stays shown. */
     ++g_engine.stats.savestates;
+    g_engine.applied_since_enable = 0;
 }
