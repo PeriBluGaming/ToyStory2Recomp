@@ -87,13 +87,29 @@ add_executable(ts2_cheat_menu_view_tests
 target_link_libraries(ts2_cheat_menu_view_tests PRIVATE
     psxcheat_psxrecomp_testlib ts2_cheat_test_runtime_ui)
 
+# Phase 2D: "remember-changes" persistence through a fake PsxMenuHost.mod_set
+# (records calls only; no file is written). Links the real plugin so its
+# activation reads the launcher options.
+add_executable(ts2_cheat_menu_persist_tests
+    "${CMAKE_CURRENT_LIST_DIR}/cheat_menu_persist_tests.c"
+    "${CMAKE_CURRENT_LIST_DIR}/psx_runtime_stub.c"
+    "${CMAKE_CURRENT_LIST_DIR}/plugin_stub.c"
+    "${TS2_CHEAT_MENU_DIR}/cheat_menu_plugin.c"
+    "${TS2_CHEAT_MENU_DIR}/cheat_menu_view.c"
+    "${TS2_CHEAT_MENU_DIR}/cheat_menu_state.c"
+    "${TS2_CHEAT_MENU_DIR}/ts2_cheat_engine.c"
+)
+target_link_libraries(ts2_cheat_menu_persist_tests PRIVATE
+    psxcheat_psxrecomp_testlib ts2_cheat_test_runtime_ui)
+
 add_executable(ts2_ranges_check "${CMAKE_CURRENT_LIST_DIR}/ts2_ranges_check.c")
 target_link_libraries(ts2_ranges_check PRIVATE psxcheat_psxrecomp_testlib)
 target_compile_definitions(ts2_ranges_check PRIVATE
     TS2_RANGES_FILE="${TS2_REPO_ROOT}/generated/SLUS_008.93_full.ranges")
 
 foreach(_t psxcheat_psxrecomp_testlib psxcheat_adapter_tests ts2_cheat_engine_tests
-           ts2_cheat_menu_state_tests ts2_cheat_menu_view_tests ts2_ranges_check)
+           ts2_cheat_menu_state_tests ts2_cheat_menu_view_tests
+           ts2_cheat_menu_persist_tests ts2_ranges_check)
     set_target_properties(${_t} PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${_t} PRIVATE -Wall -Wextra -Werror)
@@ -109,4 +125,5 @@ add_test(NAME psxcheat_adapter_tests COMMAND psxcheat_adapter_tests)
 add_test(NAME ts2_cheat_engine_tests COMMAND ts2_cheat_engine_tests)
 add_test(NAME ts2_cheat_menu_state_tests COMMAND ts2_cheat_menu_state_tests)
 add_test(NAME ts2_cheat_menu_view_tests COMMAND ts2_cheat_menu_view_tests)
+add_test(NAME ts2_cheat_menu_persist_tests COMMAND ts2_cheat_menu_persist_tests)
 add_test(NAME ts2_ranges_check COMMAND ts2_ranges_check)

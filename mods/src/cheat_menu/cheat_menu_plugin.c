@@ -2,6 +2,8 @@
  * SPDX-FileCopyrightText: 2026 PeriBluGaming */
 #include "cheat_menu.h"
 
+#include <string.h>
+
 #include "mod_plugins.h"
 #include "psx_menu_host.h"
 #include "ts2_cheat_engine.h"
@@ -23,12 +25,21 @@
  * frozen (host pause, F7, Rewind).
  *
  * TS2 sessions are offline only, so a plan never changes within a process
- * and the flag needs no reset. */
+ * and the flags need no reset.
+ *
+ * "remember-changes" is read here, in the plugin's activation context (the
+ * only place psx_mod_current_option_value answers for this feature). Only
+ * the exact value "true" turns it on. */
 
 static volatile int cm_activated;
+static volatile int cm_remember;
 
 static void cheat_menu_activate(void)
 {
+    char value[16];
+    cm_remember =
+        psx_mod_current_option_value(TS2_CHEAT_REMEMBER_OPTION, value, sizeof value) &&
+        strcmp(value, "true") == 0;
     cm_activated = 1;
     ts2_cheat_engine_activate();
 }
@@ -46,6 +57,11 @@ static void cheat_menu_savestate(void)
 int ts2_cheat_menu_activated(void)
 {
     return cm_activated;
+}
+
+int ts2_cheat_menu_remember_changes(void)
+{
+    return cm_remember;
 }
 
 PSX_MOD_CONSTRUCTOR(register_cheat_menu)

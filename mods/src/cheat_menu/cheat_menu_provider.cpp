@@ -26,6 +26,15 @@
 // g_mu. Lock order: g_mu is the only lock here; the engine takes none and
 // its VBlank callback never takes g_mu.
 //
+// Persistence (launcher option "remember-changes", off by default): an
+// accepted toggle is handed to PsxMenuHost.mod_set from sync_cheats_locked
+// (main thread, g_mu held) with the exact package/feature/option ids; the
+// runtime records it and writes mods/state.toml on the main thread later.
+// mod_set only takes the runtime's g_ovl_mu briefly, a leaf lock it never
+// holds while calling a provider, so g_mu -> g_ovl_mu cannot deadlock. The
+// runtime reports no disk result to the provider, so the footer says
+// "saving", never "saved".
+//
 // Toggles: F10, and Select + L3 on any gamepad, in either order. The chord
 // fires once per press, on the transition to both buttons held, using the
 // processed button events checked against SDL's live state
@@ -243,7 +252,10 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
     // Activation (and so the engine's launcher option) ran before attach:
     // the first sync shows the real initial state.
     cheat_menu_view_init(&g_view);
-    (void)cheat_menu_view_sync(&g_view);
+    cheat_menu_view_set_persist(&g_view, ts2_cheat_menu_remember_changes(),
+                                cheat_menu_persist_via_host,
+                                const_cast<PsxMenuHost *>(host));
+    (void)cheat_menu_view_sync(&g_view);  // no request pending: persists nothing
     RecompRuntimeUiConfig cfg{};
     cfg.title = "Cheat Menu";
     cfg.subtitle = "Developer build";
@@ -349,6 +361,7 @@ void p_detach(void *) {
     g_host = nullptr;
     g_paused = false;
     cm_chord_reset(&g_chord);
+    cheat_menu_view_set_persist(&g_view, 0, nullptr, nullptr);  // host is gone
 }
 
 const PsxMenuProvider kProvider = {

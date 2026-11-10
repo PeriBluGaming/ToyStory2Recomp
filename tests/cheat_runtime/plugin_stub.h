@@ -19,6 +19,8 @@ typedef struct plugin_stub {
     const void *provider;
     /* Package option "max-coins": NULL means "no value". */
     const char *option_value;
+    /* Package option "remember-changes": NULL means "no value". */
+    const char *remember_value;
     int option_reads;
 } plugin_stub;
 

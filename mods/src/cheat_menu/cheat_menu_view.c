@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "cheat_menu.h"     /* package / feature ids */
+#include "psx_menu_host.h"  /* PsxMenuHost (struct only) */
+
 static int is_key(const RecompRuntimeUiItem *item, const char *key)
 {
     return item && item->key && strcmp(item->key, key) == 0;
@@ -113,12 +116,41 @@ void cheat_menu_view_callbacks(cheat_menu_view *v, RecompRuntimeUiCallbacks *cb)
     cb->is_enabled = cheat_menu_view_is_enabled;
 }
 
+int cheat_menu_persist_via_host(void *ctx, const char *option_id, const char *value)
+{
+    const PsxMenuHost *host = (const PsxMenuHost *)ctx;
+    if (!option_id || !value || !host || !host->mod_set) return 0;
+    if (host->netplay_active && host->netplay_active()) return 0;
+    (void)host->mod_set(TS2_CHEAT_MENU_PACKAGE_ID, TS2_CHEAT_MENU_FEATURE_ID,
+                        option_id, value);
+    return 1;
+}
+
+void cheat_menu_view_set_persist(cheat_menu_view *v, int remember,
+                                 cheat_menu_persist_fn fn, void *ctx)
+{
+    if (!v) return;
+    v->remember = remember != 0;
+    v->persist = fn;
+    v->persist_ctx = ctx;
+}
+
 int cheat_menu_view_sync(cheat_menu_view *v)
 {
     int applied;
     if (!v) return 0;
     applied = cheat_menu_state_sync(&v->state);
     refresh_text(v);
+    v->last_persist = CHEAT_MENU_PERSIST_NONE;
+    /* Only an explicit request the engine accepted; the value is the
+     * engine's resulting state, so the latest request wins. */
+    if (applied && v->remember) {
+        static const char option_id[] = TS2_CHEAT_MAX_COINS_OPTION;
+        const char *value = v->state.snapshot.enabled ? "true" : "false";
+        ++v->persist_attempts;
+        v->last_persist = v->persist && v->persist(v->persist_ctx, option_id, value)
+            ? CHEAT_MENU_PERSIST_QUEUED : CHEAT_MENU_PERSIST_FAILED;
+    }
     return applied;
 }
 
@@ -134,6 +166,8 @@ const char *cheat_menu_view_status(cheat_menu_view *v)
     case TS2_CHEAT_UNAVAILABLE:
     default: what = "unavailable"; break;
     }
-    snprintf(v->status_text, sizeof v->status_text, "Max Coins: %s", what);
+    snprintf(v->status_text, sizeof v->status_text, "Max Coins: %s%s", what,
+             v->last_persist == CHEAT_MENU_PERSIST_QUEUED ? " - saving for next start" :
+             v->last_persist == CHEAT_MENU_PERSIST_FAILED ? " - not saved" : "");
     return v->status_text;
 }
