@@ -16,6 +16,21 @@ static const psxcheat_psx_range k_writable[] = {
      * addresses (>= 0x800D0000). Used by the "Max Coins" test cheat
      * 800B2226 0063. */
     { TS2_CHEAT_COINS_ADDR, TS2_CHEAT_COINS_ADDR + 2u },
+    /* Lives counter (int16), D2. Phase 2E-D1, static analysis of the EXE
+     * (disc/SLUS_008.93) and a pattern scan of the whole disc image: every
+     * access found in the EXE is absolute (lui 0x800B + 0x2222), and the
+     * scan found no direct overlay store to it with the searched patterns
+     * (lui 0x800B + store, lui 0x800B + addiu). Indirect or computed
+     * overlay accesses were not ruled out. Extra-life pickup func_8007678C
+     * adds 1 only while value < 9 (0x80076C70..0x80076C9C); the death path
+     * in func_8007A9E8 goes to game over at 0 and otherwise subtracts 1
+     * (0x8007B030..0x8007B060; respawn func_8007BCE4 0x8007BE30); the HUD
+     * (func_80074F80, 0x800757AC) prints it; save/restore copies it as a
+     * byte into the save block 0x800C1608 (0x80078C84 / 0x80078CC4). Not
+     * code (ts2_ranges_check), below the overlay load addresses, disjoint
+     * from the coin counter. Used by the "Infinite Lives" cheat
+     * 800B2222 0009. */
+    { TS2_CHEAT_LIVES_ADDR, TS2_CHEAT_LIVES_ADDR + 2u },
 };
 static const size_t k_writable_count = sizeof k_writable / sizeof k_writable[0];
 

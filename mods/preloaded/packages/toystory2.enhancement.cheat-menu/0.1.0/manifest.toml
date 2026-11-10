@@ -4,7 +4,7 @@ version = "0.1.0"
 name = "Cheat Menu"
 author = "PeriBluGaming"
 license = "PolyForm-Noncommercial-1.0.0"
-description = "Developer-only in-game Cheat Menu with one off-by-default test cheat (Max Coins)."
+description = "Developer-only in-game Cheat Menu with two off-by-default test cheats (Max Coins, Infinite Lives)."
 resolver = "declarative"
 save_compatibility = "shared"
 
@@ -14,7 +14,7 @@ game_id = "SLUS-00893"
 [[feature]]
 id = "cheat-menu"
 name = "Cheat Menu (developer)"
-description = "Opens an in-game overlay with F10 or Select + L3 on a controller. The game and its audio pause while it is open, and the game receives no input from it. The overlay offers Resume Game and a Max Coins on/off switch that shows whether the cheat is off, armed (waiting to apply after the game resumes or starts), active, in error (stopped after a failed write) or unavailable. The F7 save-state menu is unavailable while the overlay is open. Max Coins is off by default; the option below sets its state at game start, and the overlay can switch it at any time (remembered for the next start only when Remember in-game changes is on)."
+description = "Opens an in-game overlay with F10 or Select + L3 on a controller. The game and its audio pause while it is open, and the game receives no input from it. The overlay offers Resume Game and an on/off switch per cheat (Max Coins, Infinite Lives) that shows whether the cheat is off, armed (waiting to apply after the game resumes or starts), active, in error (stopped after a failed write) or unavailable. The F7 save-state menu is unavailable while the overlay is open. Both cheats are off by default; their options below set their state at game start, and the overlay can switch each one at any time (remembered for the next start only when Remember in-game changes is on)."
 group = "Gameplay"
 channel = "developer"
 default_enabled = false
@@ -29,9 +29,17 @@ default = "false"
 
 [[option]]
 feature = "cheat-menu"
+id = "infinite-lives"
+label = "Infinite Lives (test cheat)"
+description = "Developer test: keeps the lives counter at 9, the game's own maximum (Action Replay code 800B2222 0009), once per frame after the game has started, so a lost life is restored and the game never ends in game over. Off by default. This sets the state at the next game start; the in-game Cheat Menu can switch it on or off at any time, and changes this setting only when Remember in-game changes is on. Switching it off stops the writes but does not restore the previous count. The lives count is saved to the memory card with your progress, so test with a copy of your memory card."
+type = "boolean"
+default = "false"
+
+[[option]]
+feature = "cheat-menu"
 id = "remember-changes"
 label = "Remember in-game changes"
-description = "Off by default. When on, switching Max Coins in the in-game Cheat Menu also updates the Max Coins option above, so the next game start uses it. Only changes you make in the menu are remembered; a cheat stopped by an error, a loaded save state or a rewind changes nothing. When off, in-game changes last until the game closes."
+description = "Off by default. When on, switching a cheat in the in-game Cheat Menu also updates that cheat's option above, so the next game start uses it. Only changes you make in the menu are remembered; a cheat stopped by an error, a loaded save state or a rewind changes nothing. When off, in-game changes last until the game closes."
 type = "boolean"
 default = "false"
 

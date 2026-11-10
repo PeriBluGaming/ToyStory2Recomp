@@ -364,16 +364,19 @@ static void test_ts2_policy(void)
     psxcheat_memory m;
     g_test = "TS2 policy";
 
-    /* Exactly one explicit entry: the Max Coins counter, 2 bytes. */
+    /* Exactly two explicit entries: the Max Coins counter and (Phase 2E-D2)
+     * the lives counter, 2 bytes each, disjoint. */
     list = ts2_cheat_writable_ranges(&count);
-    CHECK(count == 1);
+    CHECK(count == 2);
     CHECK(list[0].start == 0x800B2226u && list[0].end == 0x800B2228u);
+    CHECK(list[1].start == 0x800B2222u && list[1].end == 0x800B2224u);   /* lives (2E-D2) */
+    CHECK(TS2_CHEAT_LIVES_ADDR == 0x800B2222u);
     CHECK(TS2_CHEAT_COINS_ADDR == 0x800B2226u);
     CHECK(ts2_cheat_config_valid() == 1);
-    CHECK(ts2_cheat_adapter_config(&cfg) == 1 && cfg.writable_count == 1 && cfg.verify_readback == 1);
+    CHECK(ts2_cheat_adapter_config(&cfg) == 1 && cfg.writable_count == 2 && cfg.verify_readback == 1);
     CHECK(ts2_cheat_adapter_config(NULL) == 0);
 
-    /* Through the adapter: only that span is writable. */
+    /* Through the adapter: only those two spans are writable. */
     stub_reset();
     CHECK(psxcheat_psx_init(&g_ad, &cfg) == PSXCHEAT_PSX_OK);
     CHECK(psxcheat_psx_begin(&g_ad) == 1);
@@ -383,7 +386,12 @@ static void test_ts2_policy(void)
     CHECK(valid(0x0B2228, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_NOT_ALLOWLISTED);
     CHECK(valid(0x0B2225, 1) == 0 && valid(0x0B2228, 1) == 0);
     CHECK(valid(0x0B2227, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_MISALIGNED);
-    CHECK(valid(0x0B2222, 2) == 0);   /* lives counter: not allowlisted */
+    CHECK(valid(0x0B2222, 2) == 1);   /* lives counter (2E-D2) */
+    CHECK(valid(0x0B2222, 1) == 1 && valid(0x0B2223, 1) == 1);
+    CHECK(valid(0x0B2220, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_NOT_ALLOWLISTED);
+    CHECK(valid(0x0B2221, 1) == 0);   /* byte below the lives span */
+    CHECK(valid(0x0B2224, 1) == 0 && valid(0x0B2225, 1) == 0);  /* gap between the spans */
+    CHECK(valid(0x0B221E, 2) == 0);   /* health counter: not allowlisted */
     CHECK(valid(0x0A10F4, 2) == 0);   /* D1 variable: not allowlisted */
     CHECK(valid(0x0C1618, 1) == 0);   /* other D2 data: not allowlisted */
     CHECK(w16(0x0B2226, 0x0063) == 1);

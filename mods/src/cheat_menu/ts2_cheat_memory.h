@@ -40,6 +40,8 @@ extern "C" {
 
 /* Max Coins: coin counter, int16, capped at 99 by the game. */
 #define TS2_CHEAT_COINS_ADDR 0x800B2226u
+/* Infinite Lives: lives counter, int16, capped at 9 by the game. */
+#define TS2_CHEAT_LIVES_ADDR 0x800B2222u
 
 /* The explicit writable list (count via *count). */
 const psxcheat_psx_range *ts2_cheat_writable_ranges(size_t *count);

@@ -8,8 +8,9 @@
  * independent slot: own program, own memory adapter configured with only
  * that cheat's ranges, own state, error and statistics. A cheat that fails
  * validation is UNAVAILABLE on its own; a failed run disables only its own
- * slot. The table currently holds one verified test cheat, "Max Coins"
- * (800B2226 0063), at index 0. The single-cheat functions below are the
+ * slot. The table holds two verified test cheats: "Max Coins"
+ * (800B2226 0063) at index 0 and "Infinite Lives" (800B2222 0009) at
+ * index 1. The single-cheat functions below are the
  * index-0 wrappers of the *_at() functions and keep their behaviour.
  *
  * Lifecycle (psxrecomp plugin "toystory2.cheat-menu", cheat_menu_plugin.c):

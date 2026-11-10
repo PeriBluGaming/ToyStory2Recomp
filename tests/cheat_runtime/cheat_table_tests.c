@@ -73,16 +73,27 @@ static void test_production_table(void)
     const psxcheat_psx_range *p = ts2_cheat_writable_ranges(&pn);
     g_test = "production table";
     stub_reset();
-    CHECK(t != NULL && n == 1u);   /* no new production cheats */
+    CHECK(t != NULL && n == 2u);   /* Max Coins, Infinite Lives (2E-D2) */
     CHECK(strcmp(t[0].id, "max-coins") == 0 && strcmp(t[0].id, TS2_CHEAT_MAX_COINS_OPTION) == 0);
     CHECK(strcmp(t[0].label, "Max Coins") == 0);
     CHECK(strcmp(t[0].code, "800B2226 0063") == 0);
     CHECK(t[0].range_count == 1u && t[0].ranges[0].start == 0x800B2226u &&
           t[0].ranges[0].end == 0x800B2228u);
     CHECK(ts2_cheat_validate_table(t, n, p, pn, g_st) == TS2_CHEAT_TABLE_OK);
-    CHECK(g_st[0] == TS2_CHEAT_DEF_OK);
+    CHECK(g_st[0] == TS2_CHEAT_DEF_OK && g_st[1] == TS2_CHEAT_DEF_OK);
+    /* Index 1: Infinite Lives, its own 2-byte span, disjoint from coins. */
+    CHECK(strcmp(t[1].id, "infinite-lives") == 0);
+    CHECK(strcmp(t[1].label, "Infinite Lives") == 0);
+    CHECK(strcmp(t[1].code, "800B2222 0009") == 0);
+    CHECK(t[1].range_count == 1u && t[1].ranges[0].start == 0x800B2222u &&
+          t[1].ranges[0].end == 0x800B2224u);
+    CHECK(strcmp(t[1].menu_key, "cheat_menu.infinite_lives") == 0);
+    CHECK(t[1].ranges[0].end <= t[0].ranges[0].start);
     CHECK(ts2_cheat_engine_init(0) == 1);
-    CHECK(ts2_cheat_engine_count() == 1u && ts2_cheat_engine_def(0) == &t[0]);
+    CHECK(ts2_cheat_engine_count() == 2u && ts2_cheat_engine_def(0) == &t[0] &&
+          ts2_cheat_engine_def(1) == &t[1]);
+    CHECK(ts2_cheat_engine_setup_status(1) == TS2_CHEAT_DEF_OK);
+    CHECK(ts2_cheat_engine_state_at(1) == TS2_CHEAT_OFF);   /* legacy init: index 0 only */
     CHECK(ts2_cheat_engine_table_status() == TS2_CHEAT_TABLE_OK);
     CHECK(ts2_cheat_engine_setup_status(0) == TS2_CHEAT_DEF_OK);
     CHECK(ts2_cheat_engine_state() == TS2_CHEAT_OFF);
@@ -391,9 +402,9 @@ static void test_indices_and_legacy(void)
     CHECK(strcmp(ts2_cheat_table_status_name(TS2_CHEAT_TABLE_ERR_DUPLICATE_ID), "duplicate id") == 0);
     CHECK(strcmp(ts2_cheat_def_status_name(TS2_CHEAT_DEF_ERR_TARGET), "write outside own ranges") == 0);
 
-    /* Back to production: index 0 is Max Coins again, nothing else. */
+    /* Back to production: index 0 is Max Coins again, Infinite Lives off. */
     CHECK(ts2_cheat_engine_init(1) == 1);
-    CHECK(ts2_cheat_engine_count() == 1u);
+    CHECK(ts2_cheat_engine_count() == 2u && ts2_cheat_engine_enabled_at(1) == 0);
     CHECK(strcmp(ts2_cheat_engine_def(0)->id, "max-coins") == 0);
     ts2_cheat_engine_vblank();
     CHECK(stub_u16(OFF(0x800B2226u)) == 99);
@@ -504,7 +515,8 @@ static void test_activation_uses_ids(void)
     stub_reset();
     g_plugin.option_value = "true";        /* stub answers "max-coins" */
     ts2_cheat_engine_activate();
-    CHECK(ts2_cheat_engine_count() == 1u && ts2_cheat_engine_enabled_at(0) == 1);
+    CHECK(ts2_cheat_engine_count() == 2u && ts2_cheat_engine_enabled_at(0) == 1);
+    CHECK(ts2_cheat_engine_enabled_at(1) == 0);   /* its own option, unset */
     g_plugin.option_value = "yes";
     ts2_cheat_engine_activate();
     CHECK(ts2_cheat_engine_enabled_at(0) == 0);

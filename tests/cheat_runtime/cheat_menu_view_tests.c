@@ -101,7 +101,7 @@ static void test_rows(void)
     g_test = "rows";
     cheat_menu_view_init(&g_view);
     it = cheat_menu_view_items(&g_view, &n);
-    CHECK(n == 2u && it == g_view.items);
+    CHECK(n == 3u && it == g_view.items);   /* Resume, Max Coins, Infinite Lives */
     CHECK(strcmp(it[0].key, CHEAT_MENU_KEY_RESUME) == 0);
     CHECK(it[0].type == RECOMP_RUNTIME_UI_ACTION);
     CHECK(strcmp(it[0].label, "Resume Game") == 0);
@@ -176,8 +176,10 @@ static void test_resume_first_and_off_by_default(void)
     CHECK(cheat_menu_state_pending(&g_view.state, NULL) == 0);
     CHECK(ts2_cheat_engine_enabled() == 0);
 
-    /* Wraps: Up from Resume lands on Max Coins. */
+    /* Wraps: Up from Resume lands on the last row (Infinite Lives since
+     * Phase 2E-D2); one more Up reaches Max Coins. */
     recomp_runtime_ui_open(g_ui);
+    input(RECOMP_RUNTIME_UI_INPUT_UP);
     input(RECOMP_RUNTIME_UI_INPUT_UP);
     input(RECOMP_RUNTIME_UI_INPUT_ACCEPT);
     {

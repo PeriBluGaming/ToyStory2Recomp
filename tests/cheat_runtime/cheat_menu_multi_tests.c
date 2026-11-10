@@ -518,7 +518,9 @@ static void test_production_regression(void)
     CHECK(ts2_cheat_engine_init(0) == 1);
     cheat_menu_view_init(&g_view);
     it = cheat_menu_view_items(&g_view, &n);
-    CHECK(n == 2u);
+    CHECK(n == 3u);
+    CHECK(strcmp(it[2].key, "cheat_menu.infinite_lives") == 0 &&
+          strcmp(it[2].label, "Infinite Lives") == 0);
     CHECK(strcmp(it[1].key, "cheat_menu.max_coins") == 0 &&
           strcmp(it[1].key, CHEAT_MENU_KEY_MAX_COINS) == 0);
     CHECK(strcmp(it[1].label, "Max Coins") == 0);

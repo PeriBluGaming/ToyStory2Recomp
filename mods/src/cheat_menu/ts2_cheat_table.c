@@ -17,6 +17,10 @@ static const psxcheat_psx_range k_max_coins_ranges[] = {
     { TS2_CHEAT_COINS_ADDR, TS2_CHEAT_COINS_ADDR + 2u },   /* int16 coin counter */
 };
 
+static const psxcheat_psx_range k_infinite_lives_ranges[] = {
+    { TS2_CHEAT_LIVES_ADDR, TS2_CHEAT_LIVES_ADDR + 2u },   /* int16 lives counter */
+};
+
 static const ts2_cheat_def k_table[] = {
     /* Index 0: the legacy single-cheat API (ts2_cheat_engine_enabled, ...)
      * addresses this entry. Its id is the manifest option and the key
@@ -26,6 +30,14 @@ static const ts2_cheat_def k_table[] = {
       "cheat_menu.max_coins",                    /* Phase 2C key: never rename */
       "code 800B2226 0063 holds coins at 99",
       "coins held at 99" },
+    /* Index 1 (Phase 2E-D2): 9 is the game's own maximum (pickup cap). Its
+     * id is the manifest option and the persisted key: never rename. */
+    { "infinite-lives", "Infinite Lives", "800B2222 0009",
+      k_infinite_lives_ranges,
+      sizeof k_infinite_lives_ranges / sizeof k_infinite_lives_ranges[0],
+      "cheat_menu.infinite_lives",
+      "code 800B2222 0009 holds lives at 9",
+      "lives held at 9" },
 };
 
 const ts2_cheat_def *ts2_cheat_table(size_t *count)

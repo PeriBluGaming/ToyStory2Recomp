@@ -44,6 +44,7 @@ int psx_mod_current_option_value(const char *option_id, char *out, uint32_t out_
     if (out && out_size) out[0] = '\0';
     if (!option_id || !out || out_size == 0) return 0;
     if (strcmp(option_id, "max-coins") == 0) value = g_plugin.option_value;
+    else if (strcmp(option_id, "infinite-lives") == 0) value = g_plugin.lives_value;
     else if (strcmp(option_id, "remember-changes") == 0) value = g_plugin.remember_value;
     if (!value || strlen(value) + 1u > out_size) return 0;
     strcpy(out, value);
