@@ -85,17 +85,16 @@ void cheat_menu_view_init_table(cheat_menu_view *v, const ts2_cheat_def *defs, s
     cheat_menu_state_init(&v->state);
     set_item(&v->items[0], CHEAT_MENU_KEY_RESUME, "Resume Game",
              "Close the menu and continue playing.", RECOMP_RUNTIME_UI_ACTION);
-    if (!defs || n > CHEAT_MENU_MAX_CHEATS) return;   /* Resume only */
+    /* Resume only unless every effective key is valid and unique. */
+    if (!defs || n > CHEAT_MENU_MAX_CHEATS ||
+        ts2_cheat_validate_menu_keys(defs, n) != TS2_CHEAT_TABLE_OK)
+        return;
     v->defs = defs;
     v->cheat_count = n;
     for (i = 0; i < n; ++i) {
         const ts2_cheat_def *d = &defs[i];
-        const char *key = d->menu_key;
-        if (!key) {
-            snprintf(v->row_key[i], sizeof v->row_key[i], "cheat_menu.%s", d->id ? d->id : "");
-            key = v->row_key[i];
-        }
-        set_item(&v->items[1 + i], key,
+        (void)ts2_cheat_menu_key(d, v->row_key[i], sizeof v->row_key[i]);  /* validated above */
+        set_item(&v->items[1 + i], v->row_key[i],
                  d->label ? d->label : (d->id ? d->id : "Cheat"),
                  v->row_text[i], RECOMP_RUNTIME_UI_BOOL);
         refresh_text(v, i);

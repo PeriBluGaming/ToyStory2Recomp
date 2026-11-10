@@ -399,6 +399,105 @@ static void test_indices_and_legacy(void)
     CHECK(stub_u16(OFF(0x800B2226u)) == 99);
 }
 
+static void test_menu_keys(void)
+{
+    static const int all_on[3] = { 1, 1, 1 };
+    ts2_cheat_def d[3];
+    char key[TS2_CHEAT_KEY_MAX + 1u];
+    size_t i, n = 0;
+    const ts2_cheat_def *prod = ts2_cheat_table(&n);
+    g_test = "menu keys";
+    stub_reset();
+
+    /* Production: Max Coins keeps its Phase 2C key. */
+    CHECK(ts2_cheat_menu_key(&prod[0], key, sizeof key) == 1);
+    CHECK(strcmp(key, "cheat_menu.max_coins") == 0);
+    CHECK(ts2_cheat_validate_menu_keys(prod, n) == TS2_CHEAT_TABLE_OK);
+
+    /* Valid, distinct: generated keys, and explicit + generated mixed. */
+    CHECK(ts2_cheat_validate_menu_keys(k_abc, 3) == TS2_CHEAT_TABLE_OK);
+    CHECK(ts2_cheat_menu_key(&k_abc[1], key, sizeof key) == 1 && strcmp(key, "cheat_menu.b") == 0);
+    memcpy(d, k_abc, sizeof d);
+    d[0].menu_key = "cheat_menu.Custom-1";
+    d[2].menu_key = "cheat_menu.c_2.x";
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_OK);
+    CHECK(g_st[0] == TS2_CHEAT_DEF_OK && g_st[1] == TS2_CHEAT_DEF_OK && g_st[2] == TS2_CHEAT_DEF_OK);
+    /* An explicit key equal to the entry's own generated key is fine. */
+    d[0].menu_key = "cheat_menu.a";
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_OK);
+
+    /* Duplicate explicit keys. */
+    memcpy(d, k_abc, sizeof d);
+    d[0].menu_key = "cheat_menu.same";
+    d[2].menu_key = "cheat_menu.same";
+    CHECK(ts2_cheat_validate_menu_keys(d, 3) == TS2_CHEAT_TABLE_ERR_MENU_KEY);
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_ERR_MENU_KEY);
+    for (i = 0; i < 3; ++i) CHECK(g_st[i] == TS2_CHEAT_DEF_ERR_NOT_CHECKED);
+    /* Fatal: no slot is set up, nothing can run. */
+    CHECK(init(d, 3, all_on) == TS2_CHEAT_TABLE_ERR_MENU_KEY);
+    CHECK(ts2_cheat_engine_count() == 0u && ts2_cheat_engine_state_at(0) == TS2_CHEAT_UNAVAILABLE);
+    ts2_cheat_engine_vblank();
+    CHECK(g_stub.write_calls == 0);
+
+    /* Explicit vs generated collision, both directions. */
+    memcpy(d, k_abc, sizeof d);
+    d[0].menu_key = "cheat_menu.b";            /* = B's generated key */
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_ERR_MENU_KEY);
+    memcpy(d, k_abc, sizeof d);
+    d[2].menu_key = "cheat_menu.a";            /* = A's generated key, later entry */
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_ERR_MENU_KEY);
+
+    /* Invalid keys, explicit. */
+#define BADKEY(k)                                                         \
+    do {                                                                  \
+        memcpy(d, k_abc, sizeof d);                                       \
+        d[1].menu_key = (k);                                              \
+        CHECK(validate(d, 3) == TS2_CHEAT_TABLE_ERR_MENU_KEY);            \
+        CHECK(ts2_cheat_menu_key(&d[1], key, sizeof key) == 0 && key[0] == '\0'); \
+    } while (0)
+    BADKEY("");
+    BADKEY("max_coins");                        /* no prefix */
+    BADKEY("cheat_menu");                       /* prefix without the dot */
+    BADKEY("cheat_menu.");                      /* prefix only */
+    BADKEY("Cheat_menu.x");                     /* prefix is case-sensitive */
+    BADKEY("cheat_menu.a b");                   /* space */
+    BADKEY("cheat_menu.a/b");                   /* '/' is a page separator in recomp-ui */
+    BADKEY("cheat_menu.\xc3\xa4");               /* non-ASCII */
+    BADKEY("cheat_menu.resume");                /* reserved: the Resume row */
+    BADKEY("cheat_menu.01234567890123456789012345678901234567");  /* 49 bytes */
+    CHECK(strlen("cheat_menu.01234567890123456789012345678901234567") == TS2_CHEAT_KEY_MAX + 1u);
+#undef BADKEY
+    /* 48 bytes exactly is fine. */
+    memcpy(d, k_abc, sizeof d);
+    d[1].menu_key = "cheat_menu.0123456789012345678901234567890123456";
+    CHECK(strlen(d[1].menu_key) == TS2_CHEAT_KEY_MAX);
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_OK);
+
+    /* Invalid generated keys (from the id). */
+    memcpy(d, k_abc, sizeof d);
+    d[1].id = "resume";                         /* generates the reserved key */
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_ERR_MENU_KEY);
+    d[1].id = "b c";                            /* space in the id */
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_ERR_MENU_KEY);
+    d[1].id = "b";
+    d[1].menu_key = "cheat_menu.resume2";       /* explicit key rescues nothing else */
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_OK);
+    /* An id problem is still reported as an id error first. */
+    d[1].id = NULL;
+    CHECK(validate(d, 3) == TS2_CHEAT_TABLE_ERR_ID);
+
+    /* Helper edge cases. */
+    CHECK(ts2_cheat_menu_key(NULL, key, sizeof key) == 0 && key[0] == '\0');
+    CHECK(ts2_cheat_menu_key(&k_abc[0], NULL, 8) == 0);
+    CHECK(ts2_cheat_menu_key(&k_abc[0], key, 0) == 0);
+    CHECK(ts2_cheat_menu_key(&k_abc[0], key, 8) == 0 && key[0] == '\0');   /* would truncate */
+    CHECK(ts2_cheat_menu_key(&k_abc[0], key, 13) == 1 && strcmp(key, "cheat_menu.a") == 0);
+    CHECK(ts2_cheat_validate_menu_keys(NULL, 1) == TS2_CHEAT_TABLE_ERR_NULL);
+    CHECK(ts2_cheat_validate_menu_keys(k_abc, 0) == TS2_CHEAT_TABLE_ERR_EMPTY);
+    CHECK(strcmp(ts2_cheat_table_status_name(TS2_CHEAT_TABLE_ERR_MENU_KEY),
+                 "invalid or duplicate menu key") == 0);
+}
+
 static void test_activation_uses_ids(void)
 {
     g_test = "activation";
@@ -424,6 +523,7 @@ int main(void)
     test_runtime_isolation();
     test_not_started_and_savestate();
     test_indices_and_legacy();
+    test_menu_keys();
     test_activation_uses_ids();
     printf("cheat table: %d checks, %d failures\n", g_checks, g_failures);
     return g_failures ? 1 : 0;

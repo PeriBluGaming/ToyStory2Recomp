@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2026 PeriBluGaming */
 #include "ts2_cheat_table.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "ts2_cheat_engine.h"   /* TS2_CHEAT_MAX_COINS_CODE / _OPTION */
@@ -53,6 +54,64 @@ static int bounded_text(const char *s, size_t max)
     for (k = 0; k <= max; ++k)
         if (s[k] == '\0') return 1;
     return 0;
+}
+
+static int key_char(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+           c == '.' || c == '_' || c == '-';
+}
+
+int ts2_cheat_menu_key(const ts2_cheat_def *d, char *out, size_t n)
+{
+    static const char prefix[] = TS2_CHEAT_KEY_PREFIX;
+    const size_t plen = sizeof prefix - 1u;
+    size_t k, len;
+    int written;
+
+    if (!out || n == 0u) return 0;
+    out[0] = '\0';
+    if (!d) return 0;
+    if (d->menu_key) {
+        if (!bounded_text(d->menu_key, TS2_CHEAT_KEY_MAX)) return 0;
+        written = snprintf(out, n, "%s", d->menu_key);
+    } else {
+        if (!bounded_text(d->id, TS2_CHEAT_ID_MAX)) return 0;
+        written = snprintf(out, n, "%s%s", prefix, d->id);
+    }
+    /* Truncated (buffer or key too long) counts as invalid. */
+    if (written < 0 || (size_t)written >= n || (size_t)written > TS2_CHEAT_KEY_MAX) {
+        out[0] = '\0';
+        return 0;
+    }
+    len = (size_t)written;
+    if (len <= plen || strncmp(out, prefix, plen) != 0 ||
+        strcmp(out, TS2_CHEAT_KEY_RESUME) == 0) {
+        out[0] = '\0';
+        return 0;
+    }
+    for (k = 0; k < len; ++k)
+        if (!key_char(out[k])) {
+            out[0] = '\0';
+            return 0;
+        }
+    return 1;
+}
+
+ts2_cheat_table_status ts2_cheat_validate_menu_keys(const ts2_cheat_def *defs, size_t n)
+{
+    char keys[TS2_CHEAT_MAX][TS2_CHEAT_KEY_MAX + 1u];
+    size_t i, j;
+    if (!defs) return TS2_CHEAT_TABLE_ERR_NULL;
+    if (n == 0u) return TS2_CHEAT_TABLE_ERR_EMPTY;
+    if (n > TS2_CHEAT_MAX) return TS2_CHEAT_TABLE_ERR_TOO_MANY;
+    for (i = 0; i < n; ++i) {
+        if (!ts2_cheat_menu_key(&defs[i], keys[i], sizeof keys[i]))
+            return TS2_CHEAT_TABLE_ERR_MENU_KEY;
+        for (j = 0; j < i; ++j)
+            if (strcmp(keys[i], keys[j]) == 0) return TS2_CHEAT_TABLE_ERR_MENU_KEY;
+    }
+    return TS2_CHEAT_TABLE_OK;
 }
 
 static int policy_valid(const psxcheat_psx_range *policy, size_t n)
@@ -108,8 +167,7 @@ static ts2_cheat_def_status check_def(const ts2_cheat_def *d,
     size_t k, j;
 
     if (!bounded_text(d->label, 64u)) return TS2_CHEAT_DEF_ERR_LABEL;
-    if ((d->menu_key && !bounded_text(d->menu_key, TS2_CHEAT_KEY_MAX)) ||
-        (d->off_hint && !bounded_text(d->off_hint, TS2_CHEAT_HINT_MAX)) ||
+    if ((d->off_hint && !bounded_text(d->off_hint, TS2_CHEAT_HINT_MAX)) ||
         (d->active_hint && !bounded_text(d->active_hint, TS2_CHEAT_HINT_MAX)))
         return TS2_CHEAT_DEF_ERR_LABEL;
     if (!d->code || !d->code[0]) return TS2_CHEAT_DEF_ERR_CODE;
@@ -156,6 +214,8 @@ ts2_cheat_table_status ts2_cheat_validate_table(const ts2_cheat_def *defs, size_
             if (strcmp(defs[i].id, defs[j].id) == 0) st = TS2_CHEAT_TABLE_ERR_DUPLICATE_ID;
     }
     if (st != TS2_CHEAT_TABLE_OK) return st;
+    st = ts2_cheat_validate_menu_keys(defs, n);
+    if (st != TS2_CHEAT_TABLE_OK) return st;
     if (!per_def) return TS2_CHEAT_TABLE_OK;
 
     for (i = 0; i < n; ++i) per_def[i] = check_def(&defs[i], policy, policy_n);
@@ -189,6 +249,7 @@ const char *ts2_cheat_table_status_name(ts2_cheat_table_status status)
     case TS2_CHEAT_TABLE_ERR_ID: return "invalid id";
     case TS2_CHEAT_TABLE_ERR_DUPLICATE_ID: return "duplicate id";
     case TS2_CHEAT_TABLE_ERR_POLICY: return "invalid RAM policy";
+    case TS2_CHEAT_TABLE_ERR_MENU_KEY: return "invalid or duplicate menu key";
     }
     return "unknown";
 }

@@ -50,7 +50,7 @@ extern "C" {
 #endif
 
 #define CHEAT_MENU_SECTION        "Cheat Menu"
-#define CHEAT_MENU_KEY_RESUME     "cheat_menu.resume"
+#define CHEAT_MENU_KEY_RESUME     TS2_CHEAT_KEY_RESUME     /* "cheat_menu.resume" */
 #define CHEAT_MENU_KEY_MAX_COINS  "cheat_menu.max_coins"   /* production row 1 */
 #define CHEAT_MENU_MAX_ROWS       (1u + CHEAT_MENU_MAX_CHEATS)
 
@@ -88,7 +88,9 @@ typedef struct cheat_menu_view {
 /* Rows from the production table, UNAVAILABLE snapshots; no engine access. */
 void cheat_menu_view_init(cheat_menu_view *v);
 /* Rows from `defs` (tests; must be the table the engine runs for the rows
- * to bind). NULL or more than CHEAT_MENU_MAX_CHEATS entries: Resume only. */
+ * to bind). NULL, more than CHEAT_MENU_MAX_CHEATS entries, or any invalid
+ * or duplicate effective menu key (ts2_cheat_validate_menu_keys): Resume
+ * only, so no two rows can ever share a key. */
 void cheat_menu_view_init_table(cheat_menu_view *v, const ts2_cheat_def *defs, size_t n);
 
 /* Cheat row of a recomp-ui item: its slot index, or -1 (Resume, unknown). */

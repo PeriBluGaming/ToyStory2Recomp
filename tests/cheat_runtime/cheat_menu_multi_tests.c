@@ -469,6 +469,45 @@ static void test_invalid_indices(void)
     }
 }
 
+static void test_view_refuses_ambiguous_keys(void)
+{
+    ts2_cheat_def d[3];
+    size_t n = 0;
+    g_test = "view keys";
+    stub_reset();
+    host_reset();
+    memcpy(d, k_abc, sizeof d);
+    d[0].menu_key = "cheat_menu.b";            /* collides with B's generated key */
+    engine(d, 3, NULL);                        /* fatal for the engine too */
+    CHECK(ts2_cheat_engine_count() == 0u);
+    attach(d, 3, 1);
+    (void)cheat_menu_view_items(&g_view, &n);
+    CHECK(n == 1u);                            /* Resume only: no ambiguous rows */
+    CHECK(g_ui != NULL);
+    g_resume_runs = 0;
+    recomp_runtime_ui_open(g_ui);
+    in(RECOMP_RUNTIME_UI_INPUT_DOWN);          /* one row: stays on Resume */
+    in(RECOMP_RUNTIME_UI_INPUT_ACCEPT);
+    CHECK(g_resume_runs == 1);
+    CHECK(sync() == 0 && g_ncalls == 0);
+
+    d[0].menu_key = "cheat_menu.resume";       /* reserved */
+    cheat_menu_view_init_table(&g_view, d, 3);
+    (void)cheat_menu_view_items(&g_view, &n);
+    CHECK(n == 1u);
+
+    /* Distinct keys: all rows, keys as validated. */
+    d[0].menu_key = "cheat_menu.Custom-1";
+    engine(d, 3, NULL);
+    attach(d, 3, 0);
+    (void)cheat_menu_view_items(&g_view, &n);
+    CHECK(n == 4u);
+    CHECK(strcmp(g_view.items[1].key, "cheat_menu.Custom-1") == 0);
+    CHECK(strcmp(g_view.items[2].key, "cheat_menu.b") == 0);
+    CHECK(strcmp(g_view.items[3].key, "cheat_menu.custom_c") == 0);
+    CHECK(value(0) == 0 && value(1) == 0 && value(2) == 0);
+}
+
 static void test_production_regression(void)
 {
     size_t n = 0;
@@ -505,6 +544,7 @@ int main(void)
     test_unbound_rows_never_reach_engine();
     test_persistence_per_cheat();
     test_invalid_indices();
+    test_view_refuses_ambiguous_keys();
     test_production_regression();
     if (g_ui) recomp_runtime_ui_destroy(g_ui);
     printf("cheat menu multi: %d checks, %d failures\n", g_checks, g_failures);

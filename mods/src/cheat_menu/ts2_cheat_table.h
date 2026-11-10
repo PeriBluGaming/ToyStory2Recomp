@@ -14,7 +14,15 @@
  *   unusable and the engine sets up NO cheat. These are the structural
  *   problems that make the per-cheat mapping ambiguous or the policy itself
  *   untrustworthy: no table, no or too many entries, a missing/empty or
- *   duplicate id, an invalid global RAM policy.
+ *   duplicate id, an invalid or duplicate effective menu key, an invalid
+ *   global RAM policy.
+ *
+ *   Menu keys (Phase 2E-C.1): every entry's effective key -- its explicit
+ *   menu_key, or the generated "cheat_menu.<id>" -- must start with
+ *   TS2_CHEAT_KEY_PREFIX followed by at least one character, use only
+ *   [A-Za-z0-9._-], fit TS2_CHEAT_KEY_MAX, differ from the reserved
+ *   Resume key, and be unique in the table. Keys map menu rows to cheats,
+ *   so a bad key is a table error, never a per-cheat one.
  *
  *   Cheat errors (ts2_cheat_def_status, one per entry): only that cheat is
  *   UNAVAILABLE; every other cheat is set up normally. A missing label or
@@ -40,6 +48,8 @@ extern "C" {
 #define TS2_CHEAT_MAX 8u            /* entries per table (static engine slots) */
 #define TS2_CHEAT_ID_MAX 32u        /* bytes of an id, excluding NUL */
 #define TS2_CHEAT_KEY_MAX 48u       /* bytes of a menu key, excluding NUL */
+#define TS2_CHEAT_KEY_PREFIX "cheat_menu."
+#define TS2_CHEAT_KEY_RESUME "cheat_menu.resume"   /* the Resume row; reserved */
 #define TS2_CHEAT_HINT_MAX 64u      /* bytes of a hint, excluding NUL */
 
 typedef struct ts2_cheat_def {
@@ -48,8 +58,9 @@ typedef struct ts2_cheat_def {
     const char *code;               /* Action Replay text; lines separated by '\n' */
     const psxcheat_psx_range *ranges;  /* this cheat's writable allowlist (KSEG0, half-open) */
     size_t range_count;
-    /* Optional menu presentation (Phase 2E-C; NULL = generic). Not
-     * validated beyond length: they never reach the engine. */
+    /* Optional menu presentation (Phase 2E-C; NULL = generic). The hints are
+     * only length-checked (they never reach the engine); the effective menu
+     * key is validated as described above. */
     const char *menu_key;           /* recomp-ui item key; NULL: "cheat_menu.<id>" */
     const char *off_hint;           /* row text when off: "Off - <off_hint>" */
     const char *active_hint;        /* row text when active: "Active - <active_hint>" */
@@ -62,13 +73,14 @@ typedef enum ts2_cheat_table_status {
     TS2_CHEAT_TABLE_ERR_TOO_MANY,   /* more than TS2_CHEAT_MAX entries */
     TS2_CHEAT_TABLE_ERR_ID,         /* an id is NULL, empty or too long */
     TS2_CHEAT_TABLE_ERR_DUPLICATE_ID,
-    TS2_CHEAT_TABLE_ERR_POLICY      /* the global policy list is invalid */
+    TS2_CHEAT_TABLE_ERR_POLICY,     /* the global policy list is invalid */
+    TS2_CHEAT_TABLE_ERR_MENU_KEY    /* an invalid, reserved or duplicate menu key */
 } ts2_cheat_table_status;
 
 typedef enum ts2_cheat_def_status {
     TS2_CHEAT_DEF_OK = 0,
     TS2_CHEAT_DEF_ERR_NOT_CHECKED,  /* table error: entry never validated */
-    TS2_CHEAT_DEF_ERR_LABEL,        /* NULL or empty label; over-long label, key or hint */
+    TS2_CHEAT_DEF_ERR_LABEL,        /* NULL or empty label; over-long label or hint */
     TS2_CHEAT_DEF_ERR_CODE,         /* NULL or empty code */
     TS2_CHEAT_DEF_ERR_PARSE,        /* program does not parse, or has no line */
     TS2_CHEAT_DEF_ERR_RANGES,       /* no ranges, too many, or an empty/inverted one */
@@ -88,6 +100,17 @@ ts2_cheat_table_status ts2_cheat_validate_table(const ts2_cheat_def *defs, size_
                                                 const psxcheat_psx_range *policy,
                                                 size_t policy_n,
                                                 ts2_cheat_def_status *per_def);
+
+/* The effective menu key of `d` (explicit menu_key, else "cheat_menu.<id>")
+ * into out[0..n). Returns 1 when it fits and is a valid key (prefix, at
+ * least one more character, [A-Za-z0-9._-] only, at most TS2_CHEAT_KEY_MAX
+ * bytes, not the reserved Resume key); otherwise 0 and out[0] = '\0'. */
+int ts2_cheat_menu_key(const ts2_cheat_def *d, char *out, size_t n);
+
+/* Table-level menu-key check: TS2_CHEAT_TABLE_ERR_MENU_KEY when any
+ * effective key is invalid or two are equal; the structural errors (NULL,
+ * EMPTY, TOO_MANY) as ts2_cheat_validate_table reports them. Pure. */
+ts2_cheat_table_status ts2_cheat_validate_menu_keys(const ts2_cheat_def *defs, size_t n);
 
 /* Validate one parsed program's write targets against an adapter configured
  * with the cheat's ranges: known width, 16-bit aligned, inside 2 MiB RAM,
