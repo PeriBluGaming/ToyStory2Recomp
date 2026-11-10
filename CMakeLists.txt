@@ -68,13 +68,15 @@ target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_provider.cpp"
 )
 
-# psxcheat core unit tests (Action Replay parser/executor, fake memory only).
-# Off by default: normal and release builds neither build nor run them, and the
-# core is not linked into psx-runtime yet.
-option(TS2_BUILD_CHEAT_CORE_TESTS "Build the psxcheat core unit tests (CTest)" OFF)
+# psxcheat unit tests: the Action Replay core (fake memory) and the psxrecomp
+# memory adapter (stubbed runtime services). Off by default: normal and
+# release builds neither build nor run them, and neither the core nor the
+# adapter is linked into psx-runtime yet.
+option(TS2_BUILD_CHEAT_CORE_TESTS "Build the psxcheat core and adapter unit tests (CTest)" OFF)
 if(TS2_BUILD_CHEAT_CORE_TESTS)
     enable_testing()
     add_subdirectory(tests/cheat_core)
+    add_subdirectory(tests/cheat_runtime)
 endif()
 
 target_include_directories(psx-runtime PRIVATE
