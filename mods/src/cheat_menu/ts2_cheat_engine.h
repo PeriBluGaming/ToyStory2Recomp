@@ -3,8 +3,14 @@
 #ifndef TS2_CHEAT_ENGINE_H
 #define TS2_CHEAT_ENGINE_H
 
-/* Cheat Menu (Phase 1C-C2a): the developer-only runtime engine for ONE
- * verified test cheat, "Max Coins" (800B2226 0063).
+/* Cheat Menu: the developer-only runtime engine. Since Phase 2E-B it runs
+ * every entry of the static cheat table (ts2_cheat_table.h) in its own,
+ * independent slot: own program, own memory adapter configured with only
+ * that cheat's ranges, own state, error and statistics. A cheat that fails
+ * validation is UNAVAILABLE on its own; a failed run disables only its own
+ * slot. The table currently holds one verified test cheat, "Max Coins"
+ * (800B2226 0063), at index 0. The single-cheat functions below are the
+ * index-0 wrappers of the *_at() functions and keep their behaviour.
  *
  * Lifecycle (psxrecomp plugin "toystory2.cheat-menu", cheat_menu_plugin.c):
  *   activation  -> ts2_cheat_engine_activate(): parse the code, configure the
@@ -38,6 +44,7 @@
 #include <stdint.h>
 
 #include "psxcheat.h"
+#include "ts2_cheat_table.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,14 +71,16 @@ typedef struct ts2_cheat_engine_stats {
     psxcheat_status last_status;
 } ts2_cheat_engine_stats;
 
-/* Activation: set up, then enable only if the package option "max-coins"
- * reads "true" (any other value, or no value, leaves it disabled). */
+/* Activation: set up every table entry, then enable each one only if the
+ * package option named by its id (Max Coins: "max-coins") reads exactly
+ * "true" (any other value, or no value, leaves it disabled). */
 void ts2_cheat_engine_activate(void);
 void ts2_cheat_engine_vblank(void);
 void ts2_cheat_engine_savestate(void);
 
-/* Set up with an explicit initial state (activation uses the option).
- * Returns 1 when the engine is ready; when setup fails the cheat stays off. */
+/* Index 0 (Max Coins): set up the production table with an explicit initial
+ * state for index 0 (other entries off). Returns 1 when index 0 is ready;
+ * when its setup fails it stays off. */
 int ts2_cheat_engine_init(int enabled);
 int ts2_cheat_engine_ready(void);
 /* Explicit opt-in/opt-out; ignored (returns 0) when not ready. Clears an
@@ -84,6 +93,32 @@ ts2_cheat_engine_stats ts2_cheat_engine_get_stats(void);
 ts2_cheat_state ts2_cheat_engine_state(void);
 /* Static English name of a state ("off", "armed", ...). */
 const char *ts2_cheat_state_name(ts2_cheat_state state);
+
+/* ---- Multi-cheat API (Phase 2E-B). Same thread rules as above. -------- */
+
+/* Set up from an explicit table and policy list (activation and the legacy
+ * init use the production ones). enabled[i] (NULL: all off) is the initial
+ * state of each slot; a slot that fails validation stays UNAVAILABLE and
+ * ignores it. Returns the table status; on a table error no slot is set up.
+ * The table must outlive the engine (it is not copied). */
+ts2_cheat_table_status ts2_cheat_engine_init_table(const ts2_cheat_def *defs, size_t n,
+                                                   const psxcheat_psx_range *policy,
+                                                   size_t policy_n,
+                                                   const int *enabled);
+ts2_cheat_table_status ts2_cheat_engine_table_status(void);
+/* Number of slots (table entries; 0 before setup or after a table error). */
+size_t ts2_cheat_engine_count(void);
+/* The slot's definition; NULL when out of range. */
+const ts2_cheat_def *ts2_cheat_engine_def(size_t index);
+/* Why a slot is UNAVAILABLE (TS2_CHEAT_DEF_OK when it is set up). */
+ts2_cheat_def_status ts2_cheat_engine_setup_status(size_t index);
+/* Out-of-range index: not ready, disabled, UNAVAILABLE, zero stats, and
+ * set_enabled_at returns 0. */
+int ts2_cheat_engine_ready_at(size_t index);
+int ts2_cheat_engine_set_enabled_at(size_t index, int enabled);
+int ts2_cheat_engine_enabled_at(size_t index);
+ts2_cheat_state ts2_cheat_engine_state_at(size_t index);
+ts2_cheat_engine_stats ts2_cheat_engine_stats_at(size_t index);
 
 #ifdef __cplusplus
 }

@@ -74,6 +74,7 @@ target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_view.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/ts2_cheat_engine.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/ts2_cheat_memory.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/ts2_cheat_table.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_runtime/psxcheat_psxrecomp.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_core/psxcheat_parse.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_core/psxcheat_exec.c"

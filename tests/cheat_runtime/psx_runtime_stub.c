@@ -31,6 +31,16 @@ static long ram_offset(uint32_t address, uint32_t width)
     return (long)(address - 0x80000000u);
 }
 
+/* Write `width` bytes at `off`? Off for drop_writes or the drop window. */
+static int keeps(long off, uint32_t width)
+{
+    if (off < 0 || g_stub.drop_writes) return 0;
+    if (g_stub.drop_to > g_stub.drop_from &&
+        (uint32_t)off < g_stub.drop_to && (uint32_t)off + width > g_stub.drop_from)
+        return 0;
+    return 1;
+}
+
 static void log_write(uint32_t address, uint32_t width, uint32_t value)
 {
     if (g_stub.log_count < STUB_LOG_MAX) {
@@ -66,7 +76,7 @@ void psx_mod_write_byte(uint32_t address, uint8_t value)
     const long off = ram_offset(address, 1u);
     ++g_stub.write_calls;
     log_write(address, 1u, value);
-    if (off >= 0 && !g_stub.drop_writes) g_stub.ram[off] = value;
+    if (keeps(off, 1u)) g_stub.ram[off] = value;
 }
 
 void psx_mod_write_half(uint32_t address, uint16_t value)
@@ -74,7 +84,7 @@ void psx_mod_write_half(uint32_t address, uint16_t value)
     const long off = ram_offset(address, 2u);
     ++g_stub.write_calls;
     log_write(address, 2u, value);
-    if (off >= 0 && !g_stub.drop_writes) {
+    if (keeps(off, 2u)) {
         g_stub.ram[off] = (uint8_t)(value & 0xFFu);
         g_stub.ram[off + 1] = (uint8_t)(value >> 8);
     }

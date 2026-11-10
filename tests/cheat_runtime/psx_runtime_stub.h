@@ -23,6 +23,9 @@ typedef struct psx_runtime_stub {
     uint8_t ram[STUB_RAM_SIZE];
     int game_started;
     int drop_writes;          /* simulate a runtime that discards writes */
+    /* Discard only writes touching canonical offsets [drop_from, drop_to)
+     * (inactive while drop_to <= drop_from). */
+    uint32_t drop_from, drop_to;
     uint32_t started_calls;
     uint32_t read_calls;
     uint32_t write_calls;
