@@ -3,13 +3,21 @@
 #include "ts2_cheat_memory.h"
 
 /* Verified writable variables / narrow spans, half-open, KSEG0. Each entry
- * needs a provenance comment (how it was verified) and must lie inside an
- * enabled candidate region.
- *
- * Intentionally empty: no TS2 cheat target has been verified yet. A
- * one-element placeholder keeps the array valid C99; the count is 0. */
-static const psxcheat_psx_range k_writable[1] = { { 0u, 0u } };
-static const size_t k_writable_count = 0u;
+ * needs a provenance comment (how it was verified) and must be permitted by
+ * ts2_cheat_range_permitted. */
+static const psxcheat_psx_range k_writable[] = {
+    /* Coin counter (int16), D2. Phase 1C-C1, static analysis of the
+     * generated code: func_8007678C loads it from 0x800B2226 and stores
+     * value + 1 only while value < 99 (coin pickup, 0x80076D8C..0x80076DAC);
+     * the HUD (func_80074F80, 0x800750B8) reads it; func_8007776C compares
+     * it with 50 (Hamm trade). Fixed global: always addressed absolutely
+     * (lui 0x800B + 0x2226), never through a heap pointer. Not code (no
+     * code-range manifest entry), far below the known overlay load
+     * addresses (>= 0x800D0000). Used by the "Max Coins" test cheat
+     * 800B2226 0063. */
+    { TS2_CHEAT_COINS_ADDR, TS2_CHEAT_COINS_ADDR + 2u },
+};
+static const size_t k_writable_count = sizeof k_writable / sizeof k_writable[0];
 
 const psxcheat_psx_range *ts2_cheat_writable_ranges(size_t *count)
 {
@@ -25,9 +33,14 @@ static int inside(psxcheat_psx_range r, uint32_t lo, uint32_t hi)
 int ts2_cheat_range_permitted(psxcheat_psx_range range)
 {
     if (inside(range, TS2_CHEAT_D1_START, TS2_CHEAT_D1_END)) return 1;
+    if (inside(range, TS2_CHEAT_D2_START, TS2_CHEAT_D2_END)) {
 #if TS2_CHEAT_D2_ENABLED
-    if (inside(range, TS2_CHEAT_D2_START, TS2_CHEAT_D2_END)) return 1;
+        return 1;
+#else
+        /* D2 stays disabled as a whole; only narrow verified spans. */
+        return range.end - range.start <= TS2_CHEAT_D2_EXPLICIT_MAX;
 #endif
+    }
     return 0;
 }
 

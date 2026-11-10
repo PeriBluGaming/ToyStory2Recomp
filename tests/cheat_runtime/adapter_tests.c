@@ -351,32 +351,62 @@ static void test_ts2_policy(void)
     const psxcheat_psx_range pause = { 0x800A10F4u, 0x800A10F6u };
     const psxcheat_psx_range cross = { 0x800A17FEu, 0x800A1802u };
     const psxcheat_psx_range below = { 0x800A04C6u, 0x800A04C9u };
-    const psxcheat_psx_range d2 = { 0x800B2196u, 0x800B2198u };
+    const psxcheat_psx_range d2_two = { 0x800B2196u, 0x800B2198u };
+    const psxcheat_psx_range d2_four = { 0x800C1618u, 0x800C161Cu };
+    const psxcheat_psx_range d2_five = { 0x800C1618u, 0x800C161Du };
+    const psxcheat_psx_range d2_whole = { TS2_CHEAT_D2_START, TS2_CHEAT_D2_END };
+    const psxcheat_psx_range d2_cross_end = { 0x800CFFFEu, 0x800D0002u };
     const psxcheat_psx_range code = { 0x80067440u, 0x80067444u };
     const psxcheat_psx_range kernel = { 0x80000100u, 0x80000104u };
     const psxcheat_psx_range empty = { 0x800A10F4u, 0x800A10F4u };
+    const psxcheat_psx_range *list;
+    uint8_t b = 0;
+    psxcheat_memory m;
     g_test = "TS2 policy";
 
-    /* The explicit list is empty: TS2 currently allows no write. */
-    (void)ts2_cheat_writable_ranges(&count);
-    CHECK(count == 0);
+    /* Exactly one explicit entry: the Max Coins counter, 2 bytes. */
+    list = ts2_cheat_writable_ranges(&count);
+    CHECK(count == 1);
+    CHECK(list[0].start == 0x800B2226u && list[0].end == 0x800B2228u);
+    CHECK(TS2_CHEAT_COINS_ADDR == 0x800B2226u);
     CHECK(ts2_cheat_config_valid() == 1);
-    CHECK(ts2_cheat_adapter_config(&cfg) == 1 && cfg.writable_count == 0 && cfg.verify_readback == 1);
+    CHECK(ts2_cheat_adapter_config(&cfg) == 1 && cfg.writable_count == 1 && cfg.verify_readback == 1);
     CHECK(ts2_cheat_adapter_config(NULL) == 0);
+
+    /* Through the adapter: only that span is writable. */
     stub_reset();
     CHECK(psxcheat_psx_init(&g_ad, &cfg) == PSXCHEAT_PSX_OK);
     CHECK(psxcheat_psx_begin(&g_ad) == 1);
-    CHECK(valid(0x0A10F4, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_NO_ALLOWLIST);
+    CHECK(valid(0x0B2226, 2) == 1);
+    CHECK(valid(0x0B2226, 1) == 1 && valid(0x0B2227, 1) == 1);  /* bytes of the int16 */
+    CHECK(valid(0x0B2224, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_NOT_ALLOWLISTED);
+    CHECK(valid(0x0B2228, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_NOT_ALLOWLISTED);
+    CHECK(valid(0x0B2225, 1) == 0 && valid(0x0B2228, 1) == 0);
+    CHECK(valid(0x0B2227, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_MISALIGNED);
+    CHECK(valid(0x0B2222, 2) == 0);   /* lives counter: not allowlisted */
+    CHECK(valid(0x0A10F4, 2) == 0);   /* D1 variable: not allowlisted */
+    CHECK(valid(0x0C1618, 1) == 0);   /* other D2 data: not allowlisted */
+    CHECK(w16(0x0B2226, 0x0063) == 1);
+    CHECK(w16(0x0B2228, 0x0063) == 0);
+    m = psxcheat_psx_backend(&g_ad);
+    CHECK(m.read8(m.ctx, 0x0B2226, &b) == 1 && b == 0x63);
     psxcheat_psx_end(&g_ad);
-    CHECK(g_stub.write_calls == 0);
+    CHECK(g_stub.write_calls == 1 && g_stub.log[0].address == 0x800B2226u &&
+          g_stub.log[0].width == 2 && g_stub.log[0].value == 0x63);
+    CHECK(g_ad.stats.verified == 1);
 
-    /* Candidate regions: D1 is permitted for explicit entries, D2 is not
-     * (disabled), nothing else is. */
+    /* Explicit-entry eligibility: D1 spans; narrow (<= 4 byte) D2 spans; D2
+     * never as a whole or in wider spans; nothing else. */
+    CHECK(TS2_CHEAT_D2_ENABLED == 0);
     CHECK(ts2_cheat_range_permitted(d1) == 1);
     CHECK(ts2_cheat_range_permitted(pause) == 1);
     CHECK(ts2_cheat_range_permitted(cross) == 0);
     CHECK(ts2_cheat_range_permitted(below) == 0);
-    CHECK(ts2_cheat_range_permitted(d2) == TS2_CHEAT_D2_ENABLED);
+    CHECK(ts2_cheat_range_permitted(d2_two) == 1);
+    CHECK(ts2_cheat_range_permitted(d2_four) == 1);
+    CHECK(ts2_cheat_range_permitted(d2_five) == 0);
+    CHECK(ts2_cheat_range_permitted(d2_whole) == 0);
+    CHECK(ts2_cheat_range_permitted(d2_cross_end) == 0);
     CHECK(ts2_cheat_range_permitted(code) == 0);
     CHECK(ts2_cheat_range_permitted(kernel) == 0);
     CHECK(ts2_cheat_range_permitted(empty) == 0);

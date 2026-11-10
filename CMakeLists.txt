@@ -57,7 +57,10 @@ psxrecomp_add_game_runtime(psx-runtime
 # free() compatibility for OpenBIOS, the right-stick Modern Camera, the
 # pause-menu Progress Tracker, and the Cheat Menu prototype (developer
 # channel; its in-game menu provider builds on recomp-ui's runtime menu and
-# Dear ImGui, already compiled into this target)
+# Dear ImGui, already compiled into this target). The Cheat Menu's engine runs
+# one off-by-default test cheat through the psxcheat Action Replay core and
+# its psxrecomp memory adapter; all of it only runs while the developer
+# feature is in the mod plan (release builds filter that feature out).
 target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/widescreen.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/skip_startup_intro.c"
@@ -66,12 +69,22 @@ target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/progress_tracker.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_plugin.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_provider.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/ts2_cheat_engine.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/ts2_cheat_memory.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_runtime/psxcheat_psxrecomp.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_core/psxcheat_parse.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_core/psxcheat_exec.c"
+)
+target_include_directories(psx-runtime PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_core"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_runtime"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu"
 )
 
-# psxcheat unit tests: the Action Replay core (fake memory) and the psxrecomp
-# memory adapter (stubbed runtime services). Off by default: normal and
-# release builds neither build nor run them, and neither the core nor the
-# adapter is linked into psx-runtime yet.
+# psxcheat unit tests: the Action Replay core (fake memory), the psxrecomp
+# memory adapter and the Cheat Menu engine/plugin lifecycle (stubbed runtime
+# services). Off by default: normal and release builds neither build nor run
+# them.
 option(TS2_BUILD_CHEAT_CORE_TESTS "Build the psxcheat core and adapter unit tests (CTest)" OFF)
 if(TS2_BUILD_CHEAT_CORE_TESTS)
     enable_testing()

@@ -4,7 +4,7 @@ version = "0.1.0"
 name = "Cheat Menu"
 author = "PeriBluGaming"
 license = "PolyForm-Noncommercial-1.0.0"
-description = "Prototype of an in-game Cheat Menu overlay. It contains no cheats yet and never changes the game."
+description = "Developer prototype of an in-game Cheat Menu overlay with one optional, off-by-default test cheat (Max Coins)."
 resolver = "declarative"
 save_compatibility = "shared"
 
@@ -14,10 +14,18 @@ game_id = "SLUS-00893"
 [[feature]]
 id = "cheat-menu"
 name = "Cheat Menu (prototype)"
-description = "Opens an in-game overlay with F10 or Select + L3 on a controller. The game and its audio pause while it is open, and the game receives no input from it. The prototype has only a Resume Game action; it contains no cheats and never changes the game. The F7 save-state menu is unavailable while the overlay is open."
+description = "Opens an in-game overlay with F10 or Select + L3 on a controller. The game and its audio pause while it is open, and the game receives no input from it. The overlay has only a Resume Game action. The F7 save-state menu is unavailable while the overlay is open. A single test cheat (Max Coins) can be switched on below; it is off by default and never runs unless switched on."
 group = "Gameplay"
 channel = "developer"
 default_enabled = false
+
+[[option]]
+feature = "cheat-menu"
+id = "max-coins"
+label = "Max Coins (test cheat)"
+description = "Developer test: keeps the coin counter at 99 (Action Replay code 800B2226 0063) once per frame after the game has started. Off by default. Takes effect at the next game start. Switching it off stops the writes but does not restore the previous coin count. Coins earned this way can be traded for a Pizza Planet token that is then saved to the memory card, so test with a copy of your memory card."
+type = "boolean"
+default = "false"
 
 [[plugin]]
 feature = "cheat-menu"

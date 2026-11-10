@@ -11,15 +11,15 @@
  *        recompiler's code-range manifest wrongly lists it as one function
  *        (0x800A04C8, 0x1338 bytes of nop/undefined opcodes). High confidence.
  *   D2 [0x800A1800, 0x800D0000)  BSS/heap above the EXE image. Upper bound
- *        not verified against the overlay load addresses. DISABLED.
+ *        not verified against the overlay load addresses. DISABLED as a
+ *        whole; it may only hold individually verified narrow spans.
  *   Everything else (kernel, EXE code, .rodata/.data gap, overlay/heap/stack
  *   area) is rejected.
  *
  * D1 and D2 are CANDIDATE regions only, never enabled as a whole. What the
- * adapter may write is the explicit list of verified variables / narrow
- * spans below; each entry must lie inside an enabled candidate region. The
- * list is empty until a verified test cheat exists, so the configuration
- * currently allows no write at all.
+ * adapter may write is the explicit list of verified variables below, and
+ * nothing else; each entry must be permitted by ts2_cheat_range_permitted:
+ * inside D1, or a span of at most TS2_CHEAT_D2_EXPLICIT_MAX bytes inside D2.
  *
  * No executable-code patching: no entry may cover code. */
 
@@ -35,13 +35,18 @@ extern "C" {
 #define TS2_CHEAT_D1_END   0x800A1800u
 #define TS2_CHEAT_D2_START 0x800A1800u
 #define TS2_CHEAT_D2_END   0x800D0000u
-#define TS2_CHEAT_D2_ENABLED 0  /* until overlay bounds and ownership are verified */
+#define TS2_CHEAT_D2_ENABLED 0  /* D2 as a whole: until overlay bounds and ownership are verified */
+#define TS2_CHEAT_D2_EXPLICIT_MAX 4u  /* bytes: largest individually verified D2 span */
 
-/* The explicit writable list (may be empty; count via *count). */
+/* Max Coins: coin counter, int16, capped at 99 by the game. */
+#define TS2_CHEAT_COINS_ADDR 0x800B2226u
+
+/* The explicit writable list (count via *count). */
 const psxcheat_psx_range *ts2_cheat_writable_ranges(size_t *count);
 
-/* 1 when `range` is a non-empty half-open range inside an ENABLED candidate
- * region (D1; D2 only when TS2_CHEAT_D2_ENABLED). */
+/* 1 when `range` may be an explicit writable entry: a non-empty half-open
+ * range inside D1, or inside D2 and at most TS2_CHEAT_D2_EXPLICIT_MAX bytes
+ * long (any size when TS2_CHEAT_D2_ENABLED). */
 int ts2_cheat_range_permitted(psxcheat_psx_range range);
 
 /* 1 when every explicit entry is permitted and no two entries overlap. */
