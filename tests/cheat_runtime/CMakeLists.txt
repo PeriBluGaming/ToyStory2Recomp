@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 # SPDX-FileCopyrightText: 2026 PeriBluGaming
 #
-# psxcheat <-> psxrecomp adapter tests and Cheat Menu engine lifecycle tests.
+# psxcheat <-> psxrecomp adapter tests, Cheat Menu engine lifecycle tests and
+# the Cheat Menu rows driven through recomp-ui's runtime menu model.
 # The psxrecomp services are stubs (psx_runtime_stub.c, plugin_stub.c)
 # compiled against the real mod_plugins.h / psx_menu_host.h; the test
 # executables are never part of the game and no guest memory is touched.
@@ -21,6 +22,7 @@ set(TS2_REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 set(PSXCHEAT_RUNTIME_DIR "${TS2_REPO_ROOT}/mods/src/cheat_runtime")
 set(TS2_CHEAT_MENU_DIR "${TS2_REPO_ROOT}/mods/src/cheat_menu")
 set(PSXRECOMP_MOD_INCLUDE "${TS2_REPO_ROOT}/psxrecomp/runtime/include")
+set(RECOMP_UI_SRC "${TS2_REPO_ROOT}/recomp-ui/src")
 
 if(NOT TARGET psxcheat_core)
     add_subdirectory("${TS2_REPO_ROOT}/tests/cheat_core"
@@ -67,13 +69,31 @@ add_executable(ts2_cheat_menu_state_tests
 )
 target_link_libraries(ts2_cheat_menu_state_tests PRIVATE psxcheat_psxrecomp_testlib)
 
+# Phase 2C: Cheat Menu rows driven through recomp-ui's real runtime menu
+# model. recomp_runtime_ui.c is compiled from the submodule unchanged, as
+# third-party code: SYSTEM includes and none of the strict warning flags.
+add_library(ts2_cheat_test_runtime_ui STATIC "${RECOMP_UI_SRC}/common/recomp_runtime_ui.c")
+target_include_directories(ts2_cheat_test_runtime_ui SYSTEM PUBLIC
+    "${RECOMP_UI_SRC}" "${RECOMP_UI_SRC}/common")
+
+add_executable(ts2_cheat_menu_view_tests
+    "${CMAKE_CURRENT_LIST_DIR}/cheat_menu_view_tests.c"
+    "${CMAKE_CURRENT_LIST_DIR}/psx_runtime_stub.c"
+    "${CMAKE_CURRENT_LIST_DIR}/plugin_stub.c"
+    "${TS2_CHEAT_MENU_DIR}/cheat_menu_view.c"
+    "${TS2_CHEAT_MENU_DIR}/cheat_menu_state.c"
+    "${TS2_CHEAT_MENU_DIR}/ts2_cheat_engine.c"
+)
+target_link_libraries(ts2_cheat_menu_view_tests PRIVATE
+    psxcheat_psxrecomp_testlib ts2_cheat_test_runtime_ui)
+
 add_executable(ts2_ranges_check "${CMAKE_CURRENT_LIST_DIR}/ts2_ranges_check.c")
 target_link_libraries(ts2_ranges_check PRIVATE psxcheat_psxrecomp_testlib)
 target_compile_definitions(ts2_ranges_check PRIVATE
     TS2_RANGES_FILE="${TS2_REPO_ROOT}/generated/SLUS_008.93_full.ranges")
 
 foreach(_t psxcheat_psxrecomp_testlib psxcheat_adapter_tests ts2_cheat_engine_tests
-           ts2_cheat_menu_state_tests ts2_ranges_check)
+           ts2_cheat_menu_state_tests ts2_cheat_menu_view_tests ts2_ranges_check)
     set_target_properties(${_t} PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${_t} PRIVATE -Wall -Wextra -Werror)
@@ -88,4 +108,5 @@ endif()
 add_test(NAME psxcheat_adapter_tests COMMAND psxcheat_adapter_tests)
 add_test(NAME ts2_cheat_engine_tests COMMAND ts2_cheat_engine_tests)
 add_test(NAME ts2_cheat_menu_state_tests COMMAND ts2_cheat_menu_state_tests)
+add_test(NAME ts2_cheat_menu_view_tests COMMAND ts2_cheat_menu_view_tests)
 add_test(NAME ts2_ranges_check COMMAND ts2_ranges_check)

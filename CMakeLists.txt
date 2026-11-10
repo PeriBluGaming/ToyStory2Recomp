@@ -55,10 +55,11 @@ psxrecomp_add_game_runtime(psx-runtime
 
 # Toy Story 2 mods: native widescreen (16:9), Skip Startup Intro, BIOS
 # free() compatibility for OpenBIOS, the right-stick Modern Camera, the
-# pause-menu Progress Tracker, and the Cheat Menu prototype (developer
+# pause-menu Progress Tracker, and the Cheat Menu (developer
 # channel; its in-game menu provider builds on recomp-ui's runtime menu and
-# Dear ImGui, already compiled into this target). The Cheat Menu's engine runs
-# one off-by-default test cheat through the psxcheat Action Replay core and
+# Dear ImGui, already compiled into this target). Its Max Coins row reaches
+# the engine through the cheat_menu_state mailbox/snapshot bridge. The engine
+# runs one off-by-default test cheat through the psxcheat Action Replay core and
 # its psxrecomp memory adapter; all of it only runs while the developer
 # feature is in the mod plan (release builds filter that feature out).
 target_sources(psx-runtime PRIVATE
@@ -69,6 +70,8 @@ target_sources(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/progress_tracker.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_plugin.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_provider.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_state.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/cheat_menu_view.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/ts2_cheat_engine.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu/ts2_cheat_memory.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_runtime/psxcheat_psxrecomp.c"

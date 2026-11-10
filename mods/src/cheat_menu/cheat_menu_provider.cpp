@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // SPDX-FileCopyrightText: 2026 PeriBluGaming
 //
-// Cheat Menu (Phase 0B prototype): the title's in-game menu provider
-// (psxrecomp runtime/include/psx_menu_host.h), drawn with recomp-ui's runtime
-// menu model and Dear ImGui over the presented frame.
+// Cheat Menu: the title's in-game menu provider (psxrecomp
+// runtime/include/psx_menu_host.h), drawn with recomp-ui's runtime menu model
+// and Dear ImGui over the presented frame. Rows: Resume Game, Max Coins
+// (cheat_menu_view.h).
 //
 // Policy stays with the runtime: PsxMenuHost.set_paused holds the guest and
 // audio through the host pause, and while is_open() reports 1 the runtime
@@ -15,6 +16,15 @@
 // Threads: attach, event, is_open, set_open and detach run on the main
 // thread; draw runs on the GL thread (the render thread when enabled).
 // g_mu guards every piece of shared state.
+//
+// Cheats: the Max Coins row writes only to the cheat_menu_state mailbox (its
+// set_value may run inside handle_input on the main thread, or in theory
+// from a click inside render_imgui on the GL thread). sync_cheats_locked()
+// hands the request to the cheat engine; it runs only from p_attach, p_event
+// and p_is_open, i.e. on the main thread, which is also the thread that runs
+// the engine's VBlank callback. Draw reads only the snapshot copy, under
+// g_mu. Lock order: g_mu is the only lock here; the engine takes none and
+// its VBlank callback never takes g_mu.
 //
 // Toggles: F10, and Select + L3 on any gamepad, in either order. The chord
 // fires once per press, on the transition to both buttons held, using the
@@ -30,6 +40,7 @@
 
 #include "cheat_menu.h"
 #include "cheat_menu_chord.h"
+#include "cheat_menu_view.h"
 
 #include "psx_menu_host.h"
 #include "recomp_runtime_ui.h"
@@ -56,14 +67,17 @@ ImGuiContext *g_imgui = nullptr;       // GL thread, under g_mu
 bool g_gl_ready = false;
 uint64_t g_last_counter = 0;
 CmChord g_chord{};                     // Select + L3 tracking, under g_mu
+cheat_menu_view g_view;                // rows + cheat bridge, under g_mu
 
-constexpr const char *kResumeKey = "cheat_menu.resume";
-
-const RecompRuntimeUiItem kItems[] = {
-    {kResumeKey, "Cheat Menu", "Resume Game",
-     "Close the menu and continue playing.",
-     RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, nullptr, 0, nullptr},
-};
+// MAIN THREAD ONLY, g_mu held. Hands a pending Max Coins request to the
+// engine and refreshes the snapshot the draw callback reads. After a
+// request, the footer names the resulting state (replacing the model's
+// generic "Saved").
+void sync_cheats_locked() {
+    const bool had_request = cheat_menu_state_pending(&g_view.state, nullptr) != 0;
+    (void)cheat_menu_view_sync(&g_view);
+    if (had_request && g_ui) recomp_runtime_ui_set_status(g_ui, cheat_menu_view_status(&g_view));
+}
 
 // ---- Model callbacks (called with g_mu held) ------------------------------
 
@@ -78,7 +92,7 @@ void toggle_menu() {
 }
 
 int cb_action(void *, const RecompRuntimeUiItem *item) {
-    if (item && item->key && std::strcmp(item->key, kResumeKey) == 0) close_menu();
+    if (item && item->key && std::strcmp(item->key, CHEAT_MENU_KEY_RESUME) == 0) close_menu();
     return 0;
 }
 
@@ -226,11 +240,15 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
     g_host = host;
     g_paused = false;
     cm_chord_reset(&g_chord);
+    // Activation (and so the engine's launcher option) ran before attach:
+    // the first sync shows the real initial state.
+    cheat_menu_view_init(&g_view);
+    (void)cheat_menu_view_sync(&g_view);
     RecompRuntimeUiConfig cfg{};
     cfg.title = "Cheat Menu";
-    cfg.subtitle = "Prototype: no cheats yet";
-    cfg.items = kItems;
-    cfg.item_count = sizeof kItems / sizeof kItems[0];
+    cfg.subtitle = "Developer build";
+    cfg.items = cheat_menu_view_items(&g_view, &cfg.item_count);
+    cheat_menu_view_callbacks(&g_view, &cfg.callbacks);
     cfg.callbacks.run_action = cb_action;
     cfg.callbacks.visibility_changed = cb_visibility;
     cfg.theme = "psx";
@@ -252,7 +270,9 @@ int p_event(void *, const void *ev) {
     if (!ev) return 0;
     std::lock_guard<std::mutex> lk(g_mu);
     if (!g_ui) return 0;
-    return on_event(*static_cast<const SDL_Event *>(ev));
+    const int consumed = on_event(*static_cast<const SDL_Event *>(ev));
+    sync_cheats_locked();
+    return consumed;
 #else
     (void)ev;
     return 0;
@@ -261,12 +281,14 @@ int p_event(void *, const void *ev) {
 
 // Called by the runtime once per frame, after it drained the event queue
 // (host_pause_service), which makes it the place to drop chord bits whose
-// release an F7 or Rewind screen swallowed.
+// release an F7 or Rewind screen swallowed, and to refresh the cheat
+// snapshot (VBlank state changes, a request made outside p_event).
 int p_is_open(void *) {
     std::lock_guard<std::mutex> lk(g_mu);
 #if defined(PSX_SDL3)
     if (g_chord.has_pad) cm_chord_resync(&g_chord, chord_live((SDL_JoystickID)g_chord.pad));
 #endif
+    if (g_ui) sync_cheats_locked();
     return g_ui && recomp_runtime_ui_is_open(g_ui);
 }
 
