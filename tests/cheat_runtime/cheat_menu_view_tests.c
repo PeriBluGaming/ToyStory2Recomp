@@ -84,7 +84,7 @@ static int row_value(void)
 
 static int text_has(const char *needle)
 {
-    return strstr(g_view.coins_text, needle) != NULL;
+    return strstr(g_view.row_text[0], needle) != NULL;
 }
 
 static uint32_t traffic(void)
@@ -109,7 +109,7 @@ static void test_rows(void)
     CHECK(it[1].type == RECOMP_RUNTIME_UI_BOOL);
     CHECK(it[1].minimum == 0 && it[1].maximum == 1);
     CHECK(strcmp(it[1].label, "Max Coins") == 0);
-    CHECK(it[1].description == g_view.coins_text);   /* live text */
+    CHECK(it[1].description == g_view.row_text[0]);  /* live text */
     CHECK(strcmp(it[0].section, it[1].section) == 0); /* one page */
     CHECK(cheat_menu_view_items(NULL, &n) == NULL && n == 0u);
     /* Unknown items are refused by every callback. */

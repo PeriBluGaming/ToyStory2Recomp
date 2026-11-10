@@ -3,13 +3,19 @@
 #ifndef CHEAT_MENU_VIEW_H
 #define CHEAT_MENU_VIEW_H
 
-/* Cheat Menu (Phase 2C): the menu rows and their recomp-ui model callbacks.
+/* Cheat Menu: the menu rows and their recomp-ui model callbacks.
  *
- * Rows, in order:
- *   0  Resume Game  (ACTION; the provider handles it)
- *   1  Max Coins    (BOOL; 800B2226 0063)
+ * Rows, in order (Phase 2E-C: generated from the cheat table):
+ *   0      Resume Game  (ACTION; the provider handles it)
+ *   1..N   one BOOL row per cheat table entry, in table order; row 1 + i is
+ *          engine slot i. Production: N = 1, Max Coins (800B2226 0063).
  *
- * The Max Coins row goes through cheat_menu_state (the mailbox/snapshot
+ * A row is bound to its engine slot only while the engine runs the very
+ * same table entry (ts2_cheat_engine_def(i) == &defs[i]); an unbound row
+ * shows Unavailable and its requests are dropped, so a view/engine table
+ * mismatch can never switch the wrong cheat.
+ *
+ * Every cheat row goes through cheat_menu_state (the mailbox/snapshot
  * bridge), never through the engine directly:
  *   - get_value / is_enabled read the snapshot (and a pending request);
  *   - set_value only records a request in the mailbox;
@@ -20,7 +26,8 @@
  *
  * Persistence (Phase 2D, launcher option "remember-changes"): when enabled,
  * cheat_menu_view_sync passes each request the engine actually accepted to
- * the persist hook, once, with the engine's resulting value. Nothing else
+ * the persist hook, once per cheat, with that cheat's own option id (its
+ * table id) and the engine's resulting value. Nothing else
  * is ever persisted: not a dropped request (UNAVAILABLE), not the engine's
  * own fail-closed switch-off (ERROR), not a savestate/rewind restore, not
  * the launcher's initial value. The hook only hands the value over (the
@@ -44,8 +51,8 @@ extern "C" {
 
 #define CHEAT_MENU_SECTION        "Cheat Menu"
 #define CHEAT_MENU_KEY_RESUME     "cheat_menu.resume"
-#define CHEAT_MENU_KEY_MAX_COINS  "cheat_menu.max_coins"
-#define CHEAT_MENU_ROW_COUNT      2u
+#define CHEAT_MENU_KEY_MAX_COINS  "cheat_menu.max_coins"   /* production row 1 */
+#define CHEAT_MENU_MAX_ROWS       (1u + CHEAT_MENU_MAX_CHEATS)
 
 /* Hand one option value over for the next start. option_id is never NULL;
  * value is "true" or "false". Returns 1 when it was handed over, 0 when it
@@ -61,20 +68,31 @@ typedef enum cheat_menu_persist_result {
 
 typedef struct cheat_menu_view {
     cheat_menu_state state;
+    const ts2_cheat_def *defs;          /* table the rows were built from */
+    size_t cheat_count;                 /* cheat rows (0..CHEAT_MENU_MAX_CHEATS) */
+    int bound[CHEAT_MENU_MAX_CHEATS];   /* row i is engine slot i (last sync) */
     int remember;                       /* launcher "remember-changes" */
     cheat_menu_persist_fn persist;
     void *persist_ctx;
     cheat_menu_persist_result last_persist;
     uint32_t persist_attempts;
-    /* Description of the Max Coins row; the item points at this buffer, so
-     * the instance must not move once a menu was created from it. */
-    char coins_text[96];
-    char status_text[96];
-    RecompRuntimeUiItem items[CHEAT_MENU_ROW_COUNT];
+    /* Per cheat row: description and (generated) key. The items point at
+     * these buffers, so the instance must not move once a menu was created
+     * from it. */
+    char row_text[CHEAT_MENU_MAX_CHEATS][96];
+    char row_key[CHEAT_MENU_MAX_CHEATS][TS2_CHEAT_KEY_MAX + 1u];
+    char status_text[128];
+    RecompRuntimeUiItem items[CHEAT_MENU_MAX_ROWS];
 } cheat_menu_view;
 
-/* Rows and an UNAVAILABLE snapshot; no engine access. */
+/* Rows from the production table, UNAVAILABLE snapshots; no engine access. */
 void cheat_menu_view_init(cheat_menu_view *v);
+/* Rows from `defs` (tests; must be the table the engine runs for the rows
+ * to bind). NULL or more than CHEAT_MENU_MAX_CHEATS entries: Resume only. */
+void cheat_menu_view_init_table(cheat_menu_view *v, const ts2_cheat_def *defs, size_t n);
+
+/* Cheat row of a recomp-ui item: its slot index, or -1 (Resume, unknown). */
+int cheat_menu_view_row_index(const cheat_menu_view *v, const RecompRuntimeUiItem *item);
 
 const RecompRuntimeUiItem *cheat_menu_view_items(const cheat_menu_view *v, size_t *count);
 
@@ -101,8 +119,9 @@ int cheat_menu_persist_via_host(void *ctx, const char *option_id, const char *va
  * handed to the engine. */
 int cheat_menu_view_sync(cheat_menu_view *v);
 
-/* Footer text describing the current state after a toggle ("Max Coins:
- * armed, applies after resume", ...). Valid until the next sync. */
+/* Footer text for the last sync's request ("Max Coins: armed, applies after
+ * resume", ...): the first requested row (" (+k more)" when several), or
+ * row 1 when nothing was requested. Valid until the next call. */
 const char *cheat_menu_view_status(cheat_menu_view *v);
 
 /* The model callbacks, exposed for tests. */

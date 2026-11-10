@@ -47,9 +47,9 @@ static const psxcheat_psx_range r_c[] = { { 0x800A0700u, 0x800A0702u },
 /* A: one 16-bit write. B: three lines, mixed widths. C: two lines in two
  * separate ranges. */
 static const ts2_cheat_def k_abc[] = {
-    { "a", "Cheat A", "800A0500 1234", r_a, 1 },
-    { "b", "Cheat B", "300A0600 0011\n300A0601 0022\n800A0602 3344", r_b, 1 },
-    { "c", "Cheat C", "800A0700 0001\r\n800A0704 0002\n", r_c, 2 },
+    { "a", "Cheat A", "800A0500 1234", r_a, 1, NULL, NULL, NULL },
+    { "b", "Cheat B", "300A0600 0011\n300A0601 0022\n800A0602 3344", r_b, 1, NULL, NULL, NULL },
+    { "c", "Cheat C", "800A0700 0001\r\n800A0704 0002\n", r_c, 2, NULL, NULL, NULL },
 };
 
 static ts2_cheat_def_status g_st[TS2_CHEAT_MAX];

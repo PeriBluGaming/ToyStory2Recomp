@@ -39,6 +39,8 @@ extern "C" {
 
 #define TS2_CHEAT_MAX 8u            /* entries per table (static engine slots) */
 #define TS2_CHEAT_ID_MAX 32u        /* bytes of an id, excluding NUL */
+#define TS2_CHEAT_KEY_MAX 48u       /* bytes of a menu key, excluding NUL */
+#define TS2_CHEAT_HINT_MAX 64u      /* bytes of a hint, excluding NUL */
 
 typedef struct ts2_cheat_def {
     const char *id;                 /* stable key = manifest option id */
@@ -46,6 +48,11 @@ typedef struct ts2_cheat_def {
     const char *code;               /* Action Replay text; lines separated by '\n' */
     const psxcheat_psx_range *ranges;  /* this cheat's writable allowlist (KSEG0, half-open) */
     size_t range_count;
+    /* Optional menu presentation (Phase 2E-C; NULL = generic). Not
+     * validated beyond length: they never reach the engine. */
+    const char *menu_key;           /* recomp-ui item key; NULL: "cheat_menu.<id>" */
+    const char *off_hint;           /* row text when off: "Off - <off_hint>" */
+    const char *active_hint;        /* row text when active: "Active - <active_hint>" */
 } ts2_cheat_def;
 
 typedef enum ts2_cheat_table_status {
@@ -61,7 +68,7 @@ typedef enum ts2_cheat_table_status {
 typedef enum ts2_cheat_def_status {
     TS2_CHEAT_DEF_OK = 0,
     TS2_CHEAT_DEF_ERR_NOT_CHECKED,  /* table error: entry never validated */
-    TS2_CHEAT_DEF_ERR_LABEL,        /* NULL or empty label */
+    TS2_CHEAT_DEF_ERR_LABEL,        /* NULL or empty label; over-long label, key or hint */
     TS2_CHEAT_DEF_ERR_CODE,         /* NULL or empty code */
     TS2_CHEAT_DEF_ERR_PARSE,        /* program does not parse, or has no line */
     TS2_CHEAT_DEF_ERR_RANGES,       /* no ranges, too many, or an empty/inverted one */

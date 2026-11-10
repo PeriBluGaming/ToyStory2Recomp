@@ -113,6 +113,19 @@ add_executable(ts2_cheat_table_tests
 )
 target_link_libraries(ts2_cheat_table_tests PRIVATE psxcheat_psxrecomp_testlib)
 
+# Phase 2E-C: several independent cheat rows (synthetic N = 3 table) through
+# the real engine, bridge, view and recomp-ui model; fake menu host.
+add_executable(ts2_cheat_menu_multi_tests
+    "${CMAKE_CURRENT_LIST_DIR}/cheat_menu_multi_tests.c"
+    "${CMAKE_CURRENT_LIST_DIR}/psx_runtime_stub.c"
+    "${CMAKE_CURRENT_LIST_DIR}/plugin_stub.c"
+    "${TS2_CHEAT_MENU_DIR}/cheat_menu_view.c"
+    "${TS2_CHEAT_MENU_DIR}/cheat_menu_state.c"
+    "${TS2_CHEAT_MENU_DIR}/ts2_cheat_engine.c"
+)
+target_link_libraries(ts2_cheat_menu_multi_tests PRIVATE
+    psxcheat_psxrecomp_testlib ts2_cheat_test_runtime_ui)
+
 add_executable(ts2_ranges_check "${CMAKE_CURRENT_LIST_DIR}/ts2_ranges_check.c")
 target_link_libraries(ts2_ranges_check PRIVATE psxcheat_psxrecomp_testlib)
 target_compile_definitions(ts2_ranges_check PRIVATE
@@ -120,7 +133,8 @@ target_compile_definitions(ts2_ranges_check PRIVATE
 
 foreach(_t psxcheat_psxrecomp_testlib psxcheat_adapter_tests ts2_cheat_engine_tests
            ts2_cheat_menu_state_tests ts2_cheat_menu_view_tests
-           ts2_cheat_menu_persist_tests ts2_cheat_table_tests ts2_ranges_check)
+           ts2_cheat_menu_persist_tests ts2_cheat_table_tests ts2_cheat_menu_multi_tests
+           ts2_ranges_check)
     set_target_properties(${_t} PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${_t} PRIVATE -Wall -Wextra -Werror)
@@ -138,4 +152,5 @@ add_test(NAME ts2_cheat_menu_state_tests COMMAND ts2_cheat_menu_state_tests)
 add_test(NAME ts2_cheat_menu_view_tests COMMAND ts2_cheat_menu_view_tests)
 add_test(NAME ts2_cheat_menu_persist_tests COMMAND ts2_cheat_menu_persist_tests)
 add_test(NAME ts2_cheat_table_tests COMMAND ts2_cheat_table_tests)
+add_test(NAME ts2_cheat_menu_multi_tests COMMAND ts2_cheat_menu_multi_tests)
 add_test(NAME ts2_ranges_check COMMAND ts2_ranges_check)

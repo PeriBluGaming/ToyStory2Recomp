@@ -21,7 +21,10 @@ static const ts2_cheat_def k_table[] = {
      * addresses this entry. Its id is the manifest option and the key
      * persisted in mods/state.toml: never rename. */
     { TS2_CHEAT_MAX_COINS_OPTION, "Max Coins", TS2_CHEAT_MAX_COINS_CODE,
-      k_max_coins_ranges, sizeof k_max_coins_ranges / sizeof k_max_coins_ranges[0] },
+      k_max_coins_ranges, sizeof k_max_coins_ranges / sizeof k_max_coins_ranges[0],
+      "cheat_menu.max_coins",                    /* Phase 2C key: never rename */
+      "code 800B2226 0063 holds coins at 99",
+      "coins held at 99" },
 };
 
 const ts2_cheat_def *ts2_cheat_table(size_t *count)
@@ -105,6 +108,10 @@ static ts2_cheat_def_status check_def(const ts2_cheat_def *d,
     size_t k, j;
 
     if (!bounded_text(d->label, 64u)) return TS2_CHEAT_DEF_ERR_LABEL;
+    if ((d->menu_key && !bounded_text(d->menu_key, TS2_CHEAT_KEY_MAX)) ||
+        (d->off_hint && !bounded_text(d->off_hint, TS2_CHEAT_HINT_MAX)) ||
+        (d->active_hint && !bounded_text(d->active_hint, TS2_CHEAT_HINT_MAX)))
+        return TS2_CHEAT_DEF_ERR_LABEL;
     if (!d->code || !d->code[0]) return TS2_CHEAT_DEF_ERR_CODE;
     if (!ranges_shaped(d)) return TS2_CHEAT_DEF_ERR_RANGES;
     for (k = 0; k < d->range_count; ++k) {

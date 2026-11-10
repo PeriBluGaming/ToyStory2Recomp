@@ -17,7 +17,8 @@
 // thread; draw runs on the GL thread (the render thread when enabled).
 // g_mu guards every piece of shared state.
 //
-// Cheats: the Max Coins row writes only to the cheat_menu_state mailbox (its
+// Cheats: the cheat rows (one per cheat table entry; production: Max Coins)
+// write only to the cheat_menu_state mailbox (their
 // set_value may run inside handle_input on the main thread, or in theory
 // from a click inside render_imgui on the GL thread). sync_cheats_locked()
 // hands the request to the cheat engine; it runs only from p_attach, p_event
@@ -78,12 +79,12 @@ uint64_t g_last_counter = 0;
 CmChord g_chord{};                     // Select + L3 tracking, under g_mu
 cheat_menu_view g_view;                // rows + cheat bridge, under g_mu
 
-// MAIN THREAD ONLY, g_mu held. Hands a pending Max Coins request to the
-// engine and refreshes the snapshot the draw callback reads. After a
+// MAIN THREAD ONLY, g_mu held. Hands pending cheat requests (any row) to
+// the engine and refreshes the snapshots the draw callback reads. After a
 // request, the footer names the resulting state (replacing the model's
 // generic "Saved").
 void sync_cheats_locked() {
-    const bool had_request = cheat_menu_state_pending(&g_view.state, nullptr) != 0;
+    const bool had_request = cheat_menu_state_any_pending(&g_view.state) != 0;
     (void)cheat_menu_view_sync(&g_view);
     if (had_request && g_ui) recomp_runtime_ui_set_status(g_ui, cheat_menu_view_status(&g_view));
 }
