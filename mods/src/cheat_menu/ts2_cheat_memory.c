@@ -34,6 +34,19 @@ static const psxcheat_psx_range k_writable[] = {
 };
 static const size_t k_writable_count = sizeof k_writable / sizeof k_writable[0];
 
+/* External policy (Phase 3B): verified variables only; see the header.
+ * Adding an entry here needs the same verification as k_writable. */
+static const psxcheat_psx_range k_external[] = {
+    { TS2_CHEAT_COINS_ADDR, TS2_CHEAT_COINS_ADDR + 2u },
+    { TS2_CHEAT_LIVES_ADDR, TS2_CHEAT_LIVES_ADDR + 2u },
+};
+
+const psxcheat_psx_range *ts2_cheat_external_policy(size_t *count)
+{
+    if (count) *count = sizeof k_external / sizeof k_external[0];
+    return k_external;
+}
+
 const psxcheat_psx_range *ts2_cheat_writable_ranges(size_t *count)
 {
     if (count) *count = k_writable_count;

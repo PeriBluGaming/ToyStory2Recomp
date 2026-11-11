@@ -54,6 +54,14 @@ int ts2_cheat_range_permitted(psxcheat_psx_range range);
 /* 1 when every explicit entry is permitted and no two entries overlap. */
 int ts2_cheat_config_valid(void);
 
+/* The trusted EXTERNAL policy (Phase 3B): the only memory a user-supplied
+ * cheat (ts2_cheat_external.h) may write. Source code, never file content;
+ * every entry must lie inside the verified list above. Initially the
+ * verified variables themselves -- which the built-in cheats already own,
+ * so an external cheat targeting them is rejected as overlapping a
+ * built-in until a variable not used by a built-in is verified. */
+const psxcheat_psx_range *ts2_cheat_external_policy(size_t *count);
+
 /* Adapter configuration for TS2: the explicit list, read-back on. Returns 0
  * (leaving *out describing no writable range) when the list is invalid. */
 int ts2_cheat_adapter_config(psxcheat_psx_config *out);

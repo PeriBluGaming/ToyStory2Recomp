@@ -45,7 +45,8 @@
 extern "C" {
 #endif
 
-#define TS2_CHEAT_MAX 8u            /* entries per table (static engine slots) */
+#define TS2_CHEAT_MAX 24u           /* entries per table (static engine slots); <= 32
+                                     * (32-bit slot masks in the menu bridge) */
 #define TS2_CHEAT_ID_MAX 32u        /* bytes of an id, excluding NUL */
 #define TS2_CHEAT_KEY_MAX 48u       /* bytes of a menu key, excluding NUL */
 #define TS2_CHEAT_KEY_PREFIX "cheat_menu."

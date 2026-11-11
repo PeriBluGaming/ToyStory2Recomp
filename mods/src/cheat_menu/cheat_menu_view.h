@@ -63,7 +63,8 @@ typedef int (*cheat_menu_persist_fn)(void *ctx, const char *option_id, const cha
 typedef enum cheat_menu_persist_result {
     CHEAT_MENU_PERSIST_NONE = 0,   /* nothing to persist (or remember off) */
     CHEAT_MENU_PERSIST_QUEUED,     /* handed to the host; disk not confirmed */
-    CHEAT_MENU_PERSIST_FAILED      /* remember on, but could not hand over */
+    CHEAT_MENU_PERSIST_FAILED,     /* remember on, but could not hand over */
+    CHEAT_MENU_PERSIST_SESSION     /* remember on, but only external (session-only) rows */
 } cheat_menu_persist_result;
 
 typedef struct cheat_menu_view {
@@ -85,7 +86,9 @@ typedef struct cheat_menu_view {
     RecompRuntimeUiItem items[CHEAT_MENU_MAX_ROWS];
 } cheat_menu_view;
 
-/* Rows from the production table, UNAVAILABLE snapshots; no engine access. */
+/* Rows from the active table (ts2_cheat_active_table: built-ins, plus
+ * accepted external cheats), UNAVAILABLE snapshots; no engine access.
+ * External rows are session-only: never persisted. */
 void cheat_menu_view_init(cheat_menu_view *v);
 /* Rows from `defs` (tests; must be the table the engine runs for the rows
  * to bind). NULL, more than CHEAT_MENU_MAX_CHEATS entries, or any invalid

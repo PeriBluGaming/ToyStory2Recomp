@@ -8,6 +8,7 @@
 #include "cheat_menu.h"     /* package / feature ids */
 #include "psx_menu_host.h"  /* PsxMenuHost (struct only) */
 #include "ts2_cheat_engine.h"
+#include "ts2_cheat_external.h"
 
 static void set_item(RecompRuntimeUiItem *it, const char *key, const char *label,
                      const char *description, RecompRuntimeUiItemType type)
@@ -104,7 +105,7 @@ void cheat_menu_view_init_table(cheat_menu_view *v, const ts2_cheat_def *defs, s
 void cheat_menu_view_init(cheat_menu_view *v)
 {
     size_t n = 0;
-    const ts2_cheat_def *defs = ts2_cheat_table(&n);
+    const ts2_cheat_def *defs = ts2_cheat_active_table(&n);
     cheat_menu_view_init_table(v, defs, n);
 }
 
@@ -175,7 +176,7 @@ int cheat_menu_view_sync(cheat_menu_view *v)
 {
     size_t i;
     uint32_t asked = 0;
-    int applied, failed = 0, sent = 0;
+    int applied, failed = 0, sent = 0, session = 0;
     if (!v) return 0;
 
     /* Bind rows to engine slots. A request on an unbound row never reaches
@@ -201,6 +202,10 @@ int cheat_menu_view_sync(cheat_menu_view *v)
     for (i = 0; i < v->cheat_count; ++i) {
         const char *value;
         if (!(v->state.applied_mask & (1u << i)) || !v->bound[i]) continue;
+        if (ts2_cheat_def_is_external(&v->defs[i])) {   /* session-only */
+            session = 1;
+            continue;
+        }
         value = v->state.snapshots[i].enabled ? "true" : "false";
         ++v->persist_attempts;
         ++sent;
@@ -209,6 +214,8 @@ int cheat_menu_view_sync(cheat_menu_view *v)
     }
     if (sent)
         v->last_persist = failed ? CHEAT_MENU_PERSIST_FAILED : CHEAT_MENU_PERSIST_QUEUED;
+    else if (session)
+        v->last_persist = CHEAT_MENU_PERSIST_SESSION;
     return applied;
 }
 
@@ -242,6 +249,7 @@ const char *cheat_menu_view_status(cheat_menu_view *v)
     if (more) snprintf(extra, sizeof extra, " (+%u more)", (unsigned)more);
     snprintf(v->status_text, sizeof v->status_text, "%s: %s%s%s", label, what, extra,
              v->last_persist == CHEAT_MENU_PERSIST_QUEUED ? " - saving for next start" :
-             v->last_persist == CHEAT_MENU_PERSIST_FAILED ? " - not saved" : "");
+             v->last_persist == CHEAT_MENU_PERSIST_FAILED ? " - not saved" :
+             v->last_persist == CHEAT_MENU_PERSIST_SESSION ? " - session only" : "");
     return v->status_text;
 }

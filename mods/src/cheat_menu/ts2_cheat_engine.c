@@ -6,6 +6,7 @@
 
 #include "mod_plugins.h"  /* psx_mod_game_started, psx_mod_current_option_value */
 #include "psxcheat_psxrecomp.h"
+#include "ts2_cheat_external.h"
 #include "ts2_cheat_memory.h"
 
 /* One independent cheat. */
@@ -115,13 +116,21 @@ int ts2_cheat_engine_init(int enabled)
 
 void ts2_cheat_engine_activate(void)
 {
+    /* The active table: built-ins, plus accepted external entries once a
+     * combined table was built (ts2_cheat_external.h). Built-ins start from
+     * their launcher option, external entries from their own start state. */
     size_t n = 0, policy_n = 0, i;
-    const ts2_cheat_def *defs = ts2_cheat_table(&n);
-    const psxcheat_psx_range *policy = ts2_cheat_writable_ranges(&policy_n);
+    const ts2_cheat_def *defs = ts2_cheat_active_table(&n);
+    const size_t builtins = ts2_cheat_active_builtin_count();
+    const psxcheat_psx_range *policy = ts2_cheat_active_verified(&policy_n);
     int initial[TS2_CHEAT_MAX];
     memset(initial, 0, sizeof initial);
     for (i = 0; i < n && i < TS2_CHEAT_MAX; ++i) {
         char value[16];
+        if (i >= builtins) {
+            initial[i] = ts2_cheat_active_external_enabled(i);
+            continue;
+        }
         initial[i] = defs[i].id &&
             psx_mod_current_option_value(defs[i].id, value, sizeof value) &&
             strcmp(value, "true") == 0;
