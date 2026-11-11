@@ -31,6 +31,19 @@ static const psxcheat_psx_range k_writable[] = {
      * from the coin counter. Used by the "Infinite Lives" cheat
      * 800B2222 0009. */
     { TS2_CHEAT_LIVES_ADDR, TS2_CHEAT_LIVES_ADDR + 2u },
+    /* Player health (int16, signed), D2. Phase 3B.2, static analysis of the
+     * EXE: every access is absolute (lui 0x800B + 0x221E); the disc pattern
+     * scan found stores in the EXE only (indirect or computed overlay
+     * accesses not ruled out). Damage func_8006AF10 subtracts 1
+     * (0x8006B158..0x8006B18C) and starts the death sequence below 0
+     * (0x8006B1B4); the main loop takes a life when it is negative
+     * (0x8007B030); healing adds 4 and caps at 14 (0x80076B94..0x80076BCC);
+     * respawn func_8007BCE4 sets 14 (0x8007BD48); the HUD derives the gauge
+     * from it (0x8007599C); save/restore copies it to the save block
+     * 0x800C1608 + 0xC unclamped (0x80078CB8 / 0x80078CF8). Exactly this
+     * halfword: the timer at 0x800B2220 and the state at 0x800B221C stay
+     * closed. No built-in cheat uses it (external policy only). */
+    { TS2_CHEAT_HEALTH_ADDR, TS2_CHEAT_HEALTH_ADDR + 2u },
 };
 static const size_t k_writable_count = sizeof k_writable / sizeof k_writable[0];
 
@@ -39,6 +52,7 @@ static const size_t k_writable_count = sizeof k_writable / sizeof k_writable[0];
 static const psxcheat_psx_range k_external[] = {
     { TS2_CHEAT_COINS_ADDR, TS2_CHEAT_COINS_ADDR + 2u },
     { TS2_CHEAT_LIVES_ADDR, TS2_CHEAT_LIVES_ADDR + 2u },
+    { TS2_CHEAT_HEALTH_ADDR, TS2_CHEAT_HEALTH_ADDR + 2u },   /* Phase 3B.3 */
 };
 
 const psxcheat_psx_range *ts2_cheat_external_policy(size_t *count)

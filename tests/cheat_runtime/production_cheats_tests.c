@@ -142,7 +142,7 @@ static void test_table_and_policy(void)
     const ts2_cheat_def *t = ts2_cheat_table(&n);
     const psxcheat_psx_range *p = ts2_cheat_writable_ranges(&pn);
     g_test = "table / policy";
-    CHECK(n == 2u && pn == 2u);
+    CHECK(n == 2u && pn == 3u);   /* verified: coins, lives, health (external only) */
     CHECK(ts2_cheat_config_valid() == 1);
     CHECK(ts2_cheat_validate_table(t, n, p, pn, per) == TS2_CHEAT_TABLE_OK);
     CHECK(per[0] == TS2_CHEAT_DEF_OK && per[1] == TS2_CHEAT_DEF_OK);

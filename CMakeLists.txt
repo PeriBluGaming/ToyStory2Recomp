@@ -86,6 +86,23 @@ target_include_directories(psx-runtime PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/mods/src/cheat_menu"
 )
 
+# Phase 3B.3: controlled runtime test of an external health cheat
+# (800B221E 000E) through the synthetic external-cheat interface. Developer
+# builds only: default OFF, never set by the release workflow, refused next
+# to the release-only PSXRECOMP_REQUIRE_GAME_C, and inert unless the
+# developer-channel Cheat Menu feature is active (release packaging drops it).
+option(TS2_CHEAT_RUNTIME_TEST_HEALTH
+       "Developer runtime test: add a synthetic external 'TEST Full Health' cheat" OFF)
+if(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+    if(PSXRECOMP_REQUIRE_GAME_C)
+        message(FATAL_ERROR "TS2_CHEAT_RUNTIME_TEST_HEALTH is a developer test option and "
+                            "must not be combined with release settings (PSXRECOMP_REQUIRE_GAME_C).")
+    endif()
+    message(WARNING "TS2_CHEAT_RUNTIME_TEST_HEALTH=ON: developer runtime test build "
+                    "(synthetic external health cheat). Never ship this build.")
+    target_compile_definitions(psx-runtime PRIVATE TS2_CHEAT_RUNTIME_TEST_HEALTH=1)
+endif()
+
 # psxcheat unit tests: the Action Replay core (fake memory), the psxrecomp
 # memory adapter and the Cheat Menu engine/plugin lifecycle (stubbed runtime
 # services). Off by default: normal and release builds neither build nor run

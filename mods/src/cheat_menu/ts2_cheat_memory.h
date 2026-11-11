@@ -42,6 +42,12 @@ extern "C" {
 #define TS2_CHEAT_COINS_ADDR 0x800B2226u
 /* Infinite Lives: lives counter, int16, capped at 9 by the game. */
 #define TS2_CHEAT_LIVES_ADDR 0x800B2222u
+/* Player health, int16 (signed): 0..14 in normal play, negative = dead.
+ * Verified for EXTERNAL cheats only (Phase 3B.2); no built-in uses it. The
+ * policy authorises the address, not a value: 14 (0x000E) is the game's
+ * own maximum and the recommended value, see TS2_CHEAT_HEALTH_RECOMMENDED. */
+#define TS2_CHEAT_HEALTH_ADDR 0x800B221Eu
+#define TS2_CHEAT_HEALTH_RECOMMENDED "800B221E 000E"
 
 /* The explicit writable list (count via *count). */
 const psxcheat_psx_range *ts2_cheat_writable_ranges(size_t *count);
@@ -56,10 +62,10 @@ int ts2_cheat_config_valid(void);
 
 /* The trusted EXTERNAL policy (Phase 3B): the only memory a user-supplied
  * cheat (ts2_cheat_external.h) may write. Source code, never file content;
- * every entry must lie inside the verified list above. Initially the
- * verified variables themselves -- which the built-in cheats already own,
- * so an external cheat targeting them is rejected as overlapping a
- * built-in until a variable not used by a built-in is verified. */
+ * every entry must lie inside the verified list above. The coins and lives
+ * spans are owned by built-in cheats, so an external cheat there is
+ * rejected as overlapping a built-in; health (Phase 3B.3) is the first span
+ * an external cheat can actually use. Addresses only: no value checks. */
 const psxcheat_psx_range *ts2_cheat_external_policy(size_t *count);
 
 /* Adapter configuration for TS2: the explicit list, read-back on. Returns 0

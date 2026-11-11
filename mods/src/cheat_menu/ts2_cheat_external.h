@@ -132,6 +132,18 @@ size_t ts2_cheat_active_external_count(void);
  * (session-only, never persisted). */
 int ts2_cheat_def_is_external(const ts2_cheat_def *d);
 
+#if defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+/* Phase 3B.3 controlled runtime test: one synthetic external entry,
+ * "test-health" / "TEST Full Health" / TS2_CHEAT_HEALTH_RECOMMENDED,
+ * off at start. Pure data; it goes through the normal external validation
+ * like any file entry. Defined in cheat_menu_plugin.c and compiled only
+ * into a developer build configured with -DTS2_CHEAT_RUNTIME_TEST_HEALTH=ON
+ * (default OFF; see the root CMakeLists.txt): normal builds contain neither
+ * the function nor its data. The plugin builds it only while the developer
+ * feature is active. */
+ts2_cheat_external_input ts2_cheat_runtime_test_health_input(void);
+#endif
+
 /* Back to "no combined table" (tests). */
 void ts2_cheat_combined_reset(void);
 

@@ -7,6 +7,12 @@
 #include "mod_plugins.h"
 #include "psx_menu_host.h"
 #include "ts2_cheat_engine.h"
+#if defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+#include <stdio.h>
+
+#include "ts2_cheat_external.h"
+#include "ts2_cheat_memory.h"   /* TS2_CHEAT_HEALTH_RECOMMENDED */
+#endif
 
 /* Cheat Menu: registration and activation.
  *
@@ -34,6 +40,24 @@
 static volatile int cm_activated;
 static volatile int cm_remember;
 
+#if defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+/* Phase 3B.3 controlled runtime test entry (ts2_cheat_external.h). Only in
+ * builds configured with -DTS2_CHEAT_RUNTIME_TEST_HEALTH=ON. */
+ts2_cheat_external_input ts2_cheat_runtime_test_health_input(void)
+{
+    static const char *const lines[] = { TS2_CHEAT_HEALTH_RECOMMENDED };
+    ts2_cheat_external_input in;
+    memset(&in, 0, sizeof in);
+    in.id = "test-health";
+    in.label = "TEST Full Health";
+    in.description = "runtime test: holds health at 14";
+    in.code_lines = lines;
+    in.code_line_count = 1;
+    in.enabled = 0;   /* switched on from the menu only */
+    return in;
+}
+#endif
+
 static void cheat_menu_activate(void)
 {
     char value[16];
@@ -41,6 +65,19 @@ static void cheat_menu_activate(void)
         psx_mod_current_option_value(TS2_CHEAT_REMEMBER_OPTION, value, sizeof value) &&
         strcmp(value, "true") == 0;
     cm_activated = 1;
+#if defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+    /* Phase 3B.3 controlled runtime test (opt-in CMake option, default
+     * OFF): one synthetic external entry through the normal external
+     * validation, before the engine is set up. No file, no persistence. */
+    {
+        const ts2_cheat_external_input in = ts2_cheat_runtime_test_health_input();
+        ts2_cheat_ext_status st = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
+        const ts2_cheat_build_status b = ts2_cheat_combined_build(&in, 1, &st);
+        printf("cheat-menu: RUNTIME TEST entry '%s': %s (build %d)\n", in.id,
+               ts2_cheat_ext_status_name(st), (int)b);
+        fflush(stdout);
+    }
+#endif
     ts2_cheat_engine_activate();
 }
 

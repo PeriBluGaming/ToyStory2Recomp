@@ -182,7 +182,7 @@ static void test_production_policy(void)
     ts2_cheat_ext_status st[3];
     g_test = "production policy";
     /* Trusted external policy: verified variables only, inside the list. */
-    CHECK(np == 2u);
+    CHECK(np == 3u);
     for (i = 0; i < np; ++i) {
         int covered = 0;
         CHECK(ts2_cheat_range_permitted(p[i]) == 1);
@@ -190,16 +190,16 @@ static void test_production_policy(void)
             if (p[i].start >= v[j].start && p[i].end <= v[j].end) covered = 1;
         CHECK(covered);
     }
-    /* Consequence today: every target it allows belongs to a built-in, so a
-     * production external cheat is rejected; anything else is refused. */
+    /* Coins and lives belong to built-ins: rejected as overlapping. Health
+     * (Phase 3B.3) is open to external cheats; anything else is refused. */
     e[0] = one("coins-50", "Coins 50", LINES("800B2226 0032"), 1);
     e[1] = one("lives-5", "Lives 5", LINES("800B2222 0005"), 1);
     e[2] = one("health", "Health", LINES("800B221E 000E"), 1);
     CHECK(ts2_cheat_combined_build(e, 3, st) == TS2_CHEAT_BUILD_OK);
     CHECK(st[0] == TS2_CHEAT_EXT_ERR_OVERLAP_BUILTIN);
     CHECK(st[1] == TS2_CHEAT_EXT_ERR_OVERLAP_BUILTIN);
-    CHECK(st[2] == TS2_CHEAT_EXT_ERR_TARGET);             /* not verified: never */
-    CHECK(ts2_cheat_active_external_count() == 0u);
+    CHECK(st[2] == TS2_CHEAT_EXT_OK);                     /* health: verified, external */
+    CHECK(ts2_cheat_active_external_count() == 1u);
     ts2_cheat_combined_reset();
 }
 

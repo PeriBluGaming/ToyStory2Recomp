@@ -367,13 +367,15 @@ static void test_ts2_policy(void)
     /* Exactly two explicit entries: the Max Coins counter and (Phase 2E-D2)
      * the lives counter, 2 bytes each, disjoint. */
     list = ts2_cheat_writable_ranges(&count);
-    CHECK(count == 2);
+    CHECK(count == 3);
+    CHECK(list[2].start == 0x800B221Eu && list[2].end == 0x800B2220u);   /* health (3B.3) */
+    CHECK(TS2_CHEAT_HEALTH_ADDR == 0x800B221Eu);
     CHECK(list[0].start == 0x800B2226u && list[0].end == 0x800B2228u);
     CHECK(list[1].start == 0x800B2222u && list[1].end == 0x800B2224u);   /* lives (2E-D2) */
     CHECK(TS2_CHEAT_LIVES_ADDR == 0x800B2222u);
     CHECK(TS2_CHEAT_COINS_ADDR == 0x800B2226u);
     CHECK(ts2_cheat_config_valid() == 1);
-    CHECK(ts2_cheat_adapter_config(&cfg) == 1 && cfg.writable_count == 2 && cfg.verify_readback == 1);
+    CHECK(ts2_cheat_adapter_config(&cfg) == 1 && cfg.writable_count == 3 && cfg.verify_readback == 1);
     CHECK(ts2_cheat_adapter_config(NULL) == 0);
 
     /* Through the adapter: only those two spans are writable. */
@@ -391,7 +393,11 @@ static void test_ts2_policy(void)
     CHECK(valid(0x0B2220, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_NOT_ALLOWLISTED);
     CHECK(valid(0x0B2221, 1) == 0);   /* byte below the lives span */
     CHECK(valid(0x0B2224, 1) == 0 && valid(0x0B2225, 1) == 0);  /* gap between the spans */
-    CHECK(valid(0x0B221E, 2) == 0);   /* health counter: not allowlisted */
+    CHECK(valid(0x0B221E, 2) == 1);   /* health counter (3B.3) */
+    CHECK(valid(0x0B221E, 1) == 1 && valid(0x0B221F, 1) == 1);
+    CHECK(valid(0x0B221C, 2) == 0 && g_ad.last_reject == PSXCHEAT_PSX_REJECT_NOT_ALLOWLISTED);
+    CHECK(valid(0x0B221D, 1) == 0);   /* byte below the health span */
+    CHECK(valid(0x0B2220, 1) == 0 && valid(0x0B2221, 1) == 0);  /* timer: closed */
     CHECK(valid(0x0A10F4, 2) == 0);   /* D1 variable: not allowlisted */
     CHECK(valid(0x0C1618, 1) == 0);   /* other D2 data: not allowlisted */
     CHECK(w16(0x0B2226, 0x0063) == 1);
