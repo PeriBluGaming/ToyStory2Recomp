@@ -309,7 +309,9 @@ void report_init(ts2_cheat_file_report &r)
     for (size_t i = 0; i < TS2_CHEAT_EXTERNAL_INPUT_MAX; ++i) {
         r.shape[i] = TS2_CHEAT_ENTRY_NOT_EXAMINED;
         r.verdict[i] = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
+        r.trust[i] = TS2_CHEAT_TRUST_SAFE;
     }
+    r.mode = TS2_CHEAT_EXT_MODE_SAFE;
 }
 
 bool build_allowed() { return !ts2_cheat_session_sealed() && ts2_cheat_table_refs() == 0u; }
@@ -319,13 +321,17 @@ void build_builtins_only(ts2_cheat_file_report &r)
 {
     for (size_t i = 0; i < TS2_CHEAT_EXTERNAL_INPUT_MAX; ++i)
         if (r.verdict[i] == TS2_CHEAT_EXT_OK) r.verdict[i] = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
+    for (size_t i = 0; i < TS2_CHEAT_EXTERNAL_INPUT_MAX; ++i) r.trust[i] = TS2_CHEAT_TRUST_SAFE;
     r.validated = 0;
     r.accepted = 0;
+    r.unverified = 0;
+    r.enabled_ignored = 0;
     r.build = ts2_cheat_combined_build(nullptr, 0, nullptr);
 }
 
 // Parse bytes and build. Caller holds a report and has checked build_allowed().
-void load_bytes(const unsigned char *data, size_t size, ts2_cheat_file_report &r)
+void load_bytes(const unsigned char *data, size_t size, ts2_cheat_ext_mode mode,
+                ts2_cheat_file_report &r)
 {
     r.bytes = size;
     if (size > TS2_CHEAT_FILE_MAX_BYTES) { r.file = TS2_CHEAT_FILE_ERR_TOO_LARGE; return; }
@@ -370,16 +376,25 @@ void load_bytes(const unsigned char *data, size_t size, ts2_cheat_file_report &r
         in.code_lines = line_ptrs[i].empty() ? nullptr : line_ptrs[i].data();
         in.code_line_count = line_ptrs[i].size();
         in.enabled = e.enabled ? 1 : 0;
+        r.requested_on[i] = e.enabled ? 1u : 0u;
         inputs.push_back(in);
         origin.push_back(i);
     }
     std::vector<ts2_cheat_ext_status> verdicts(inputs.size(), TS2_CHEAT_EXT_ERR_NOT_CHECKED);
-    r.build = ts2_cheat_combined_build(inputs.empty() ? nullptr : inputs.data(), inputs.size(),
-                                       verdicts.empty() ? nullptr : verdicts.data());
+    std::vector<ts2_cheat_trust> tiers(inputs.size(), TS2_CHEAT_TRUST_SAFE);
+    r.build = ts2_cheat_combined_build_mode(inputs.empty() ? nullptr : inputs.data(), inputs.size(),
+                                            mode, verdicts.empty() ? nullptr : verdicts.data(),
+                                            tiers.empty() ? nullptr : tiers.data());
     r.validated = inputs.size();
     for (size_t k = 0; k < inputs.size(); ++k) {
         r.verdict[origin[k]] = verdicts[k];
-        if (verdicts[k] == TS2_CHEAT_EXT_OK) ++r.accepted;
+        if (verdicts[k] != TS2_CHEAT_EXT_OK) continue;
+        ++r.accepted;
+        r.trust[origin[k]] = tiers[k];
+        if (tiers[k] == TS2_CHEAT_TRUST_ADVANCED) {
+            ++r.unverified;
+            if (r.requested_on[origin[k]]) ++r.enabled_ignored;
+        }
     }
     // Entries beyond the input limit were never looked at.
     for (size_t i = entries.size(); i < r.entries && i < TS2_CHEAT_EXTERNAL_INPUT_MAX; ++i)
@@ -388,13 +403,21 @@ void load_bytes(const unsigned char *data, size_t size, ts2_cheat_file_report &r
 
 // Common driver: lifecycle gate, load, fallback, exception barrier.
 template <typename LoadFn>
-ts2_cheat_file_status run(ts2_cheat_file_report *out, LoadFn &&load) noexcept
+ts2_cheat_file_status run(ts2_cheat_file_report *out, ts2_cheat_ext_mode mode,
+                          LoadFn &&load) noexcept
 {
     ts2_cheat_file_report local;
     ts2_cheat_file_report &r = out ? *out : local;
     report_init(r);
+    r.mode = mode;
     if (!build_allowed()) {             // the engine or the menu uses the table
         r.file = TS2_CHEAT_FILE_ERR_SEALED;
+        return r.file;
+    }
+    if (mode != TS2_CHEAT_EXT_MODE_SAFE && mode != TS2_CHEAT_EXT_MODE_ADVANCED) {
+        r.mode = TS2_CHEAT_EXT_MODE_SAFE;
+        r.file = TS2_CHEAT_FILE_ERR_INTERNAL;
+        build_builtins_only(r);
         return r.file;
     }
     try {
@@ -411,7 +434,20 @@ ts2_cheat_file_status run(ts2_cheat_file_report *out, LoadFn &&load) noexcept
 extern "C" ts2_cheat_file_status ts2_cheat_file_load(const char *path_utf8,
                                                      ts2_cheat_file_report *report)
 {
-    return run(report, [path_utf8](ts2_cheat_file_report &r) {
+    return ts2_cheat_file_load_mode(path_utf8, TS2_CHEAT_EXT_MODE_SAFE, report);
+}
+
+extern "C" ts2_cheat_file_status ts2_cheat_file_load_buffer(const unsigned char *data, size_t size,
+                                                            ts2_cheat_file_report *report)
+{
+    return ts2_cheat_file_load_buffer_mode(data, size, TS2_CHEAT_EXT_MODE_SAFE, report);
+}
+
+extern "C" ts2_cheat_file_status ts2_cheat_file_load_mode(const char *path_utf8,
+                                                          ts2_cheat_ext_mode mode,
+                                                          ts2_cheat_file_report *report)
+{
+    return run(report, mode, [path_utf8, mode](ts2_cheat_file_report &r) {
         if (!path_utf8 || !path_utf8[0]) {
             r.file = TS2_CHEAT_FILE_NONE;
             return;
@@ -419,17 +455,19 @@ extern "C" ts2_cheat_file_status ts2_cheat_file_load(const char *path_utf8,
         std::vector<unsigned char> bytes;
         r.file = read_file(path_utf8, bytes);
         if (r.file != TS2_CHEAT_FILE_OK) return;
-        load_bytes(bytes.data(), bytes.size(), r);
+        load_bytes(bytes.data(), bytes.size(), mode, r);
     });
 }
 
-extern "C" ts2_cheat_file_status ts2_cheat_file_load_buffer(const unsigned char *data, size_t size,
-                                                            ts2_cheat_file_report *report)
+extern "C" ts2_cheat_file_status ts2_cheat_file_load_buffer_mode(const unsigned char *data,
+                                                                 size_t size,
+                                                                 ts2_cheat_ext_mode mode,
+                                                                 ts2_cheat_file_report *report)
 {
-    return run(report, [data, size](ts2_cheat_file_report &r) {
+    return run(report, mode, [data, size, mode](ts2_cheat_file_report &r) {
         if (!data && size) { r.file = TS2_CHEAT_FILE_ERR_READ; return; }
         static const unsigned char empty = 0;
-        load_bytes(data ? data : &empty, size, r);
+        load_bytes(data ? data : &empty, size, mode, r);
     });
 }
 
@@ -479,6 +517,12 @@ extern "C" int ts2_cheat_file_describe(const ts2_cheat_file_report *r, char *out
                              ts2_cheat_file_status_name(r->file), static_cast<unsigned>(r->error_line));
     if (r->file != TS2_CHEAT_FILE_OK)
         return std::snprintf(out, size, "cheat file: %s", ts2_cheat_file_status_name(r->file));
+    if (r->mode == TS2_CHEAT_EXT_MODE_ADVANCED)
+        return std::snprintf(out, size,
+                             "cheat file: ok, %u entries, %u accepted (%u unverified), %u rejected",
+                             static_cast<unsigned>(r->entries), static_cast<unsigned>(r->accepted),
+                             static_cast<unsigned>(r->unverified),
+                             static_cast<unsigned>(r->entries - r->accepted));
     return std::snprintf(out, size, "cheat file: ok, %u entries, %u accepted, %u rejected",
                          static_cast<unsigned>(r->entries), static_cast<unsigned>(r->accepted),
                          static_cast<unsigned>(r->entries - r->accepted));
@@ -496,6 +540,9 @@ extern "C" int ts2_cheat_file_describe_entry(const ts2_cheat_file_report *r, siz
     if (r->shape[index] != TS2_CHEAT_ENTRY_OK)
         return std::snprintf(out, size, "cheat entry %u: %s", n,
                              ts2_cheat_entry_shape_name(r->shape[index]));
+    if (r->verdict[index] == TS2_CHEAT_EXT_OK && r->trust[index] == TS2_CHEAT_TRUST_ADVANCED)
+        return std::snprintf(out, size, "cheat entry %u: ok, unverified%s", n,
+                             r->requested_on[index] ? ", enabled ignored, starts off" : "");
     return std::snprintf(out, size, "cheat entry %u: %s", n,
                          ts2_cheat_ext_status_name(r->verdict[index]));
 }

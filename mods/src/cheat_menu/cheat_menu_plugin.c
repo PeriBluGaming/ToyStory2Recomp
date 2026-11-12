@@ -61,6 +61,20 @@
  * writes to the file. The file is read once per activation; there is no
  * reload while the game runs.
  *
+ * Advanced mode (Phase 3C.4B-2). The launcher option "advanced-cheats" is
+ * the only authority for it: read in this activation, after the new
+ * session began, and on only for the exact value "true". It selects the
+ * trust mode of the one file load (ts2_cheat_file_load_mode): Safe entries
+ * behave exactly as before; entries outside the external policy may be
+ * accepted inside the verified Advanced region (ts2_cheat_memory.h) as
+ * unverified, and those always start off (the validator and the engine
+ * enforce that separately). The option is never applied live (the
+ * option-changed callback below refuses every change) and never written
+ * by the in-game menu (it persists built-in cheat options only). With a
+ * file selected, a mode line precedes the summary in Advanced mode; the
+ * summary counts the unverified entries, and each Advanced entry whose
+ * `enabled = true` was ignored gets its own line.
+ *
  * Runtime health test build (-DTS2_CHEAT_RUNTIME_TEST_HEALTH=ON, developer
  * only, default OFF): the synthetic "TEST Full Health" entry is the
  * session's build and the external cheat file is NOT loaded (a selected
@@ -76,6 +90,8 @@ static volatile int cm_remember;
 /* Last activation's cheat file result; cm_file_loaded = 0: none. */
 static ts2_cheat_file_report cm_file;
 static int cm_file_loaded;
+/* Last activation's trust mode: 1 = Advanced ("advanced-cheats" = "true"). */
+static int cm_advanced;
 /* Selected path (UTF-8). A path longer than this reads as "none selected"
  * (psx_mod_current_resource_path cannot tell the two apart). */
 static char cm_file_path[4096];
@@ -114,8 +130,14 @@ static void load_cheat_file(void)
 {
     char line[160];
     size_t i, examined;
-    (void)ts2_cheat_file_load(cm_file_path, &cm_file);
+    (void)ts2_cheat_file_load_mode(cm_file_path,
+                                   cm_advanced ? TS2_CHEAT_EXT_MODE_ADVANCED
+                                               : TS2_CHEAT_EXT_MODE_SAFE,
+                                   &cm_file);
     cm_file_loaded = 1;
+    if (cm_advanced)
+        printf("cheat-menu: advanced mode: unverified Action Replay codes allowed "
+               "(verified data region only, start off)\n");
     (void)ts2_cheat_file_describe(&cm_file, line, sizeof line);
     printf("cheat-menu: %s%s\n", line,
            cm_file.file == TS2_CHEAT_FILE_OK || cm_file.file == TS2_CHEAT_FILE_ERR_SEALED
@@ -123,7 +145,10 @@ static void load_cheat_file(void)
     examined = cm_file.entries < TS2_CHEAT_EXTERNAL_INPUT_MAX ? cm_file.entries
                                                               : TS2_CHEAT_EXTERNAL_INPUT_MAX;
     for (i = 0; i < examined; ++i) {
-        if (cm_file.shape[i] == TS2_CHEAT_ENTRY_OK && cm_file.verdict[i] == TS2_CHEAT_EXT_OK)
+        /* Accepted entries are quiet, except an unverified one whose
+         * `enabled = true` was ignored. */
+        if (cm_file.shape[i] == TS2_CHEAT_ENTRY_OK && cm_file.verdict[i] == TS2_CHEAT_EXT_OK &&
+            !(cm_file.trust[i] == TS2_CHEAT_TRUST_ADVANCED && cm_file.requested_on[i]))
             continue;
         (void)ts2_cheat_file_describe_entry(&cm_file, i, line, sizeof line);
         printf("cheat-menu:   %s\n", line);
@@ -144,12 +169,17 @@ static void cheat_menu_activate(void)
         strcmp(value, "true") == 0;
     cm_activated = 1;
     cm_file_loaded = 0;
+    cm_advanced = 0;
     /* New session: the engine lets go of the previous table first; a table
      * still referenced by an attached menu is kept (no rebuild below). */
     ts2_cheat_engine_shutdown();
     fresh = ts2_cheat_session_begin();
 #if !defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
     (void)fresh;    /* the loader checks the window itself */
+    /* Trust mode for this session: the launcher option, exactly "true". */
+    cm_advanced =
+        psx_mod_current_option_value(TS2_CHEAT_ADVANCED_OPTION, value, sizeof value) &&
+        strcmp(value, "true") == 0;
     if (cheat_file_selected()) load_cheat_file();
 #else
     if (cheat_file_selected())
@@ -203,6 +233,11 @@ int ts2_cheat_menu_remember_changes(void)
 const struct ts2_cheat_file_report *ts2_cheat_menu_file_report(void)
 {
     return cm_file_loaded ? &cm_file : NULL;
+}
+
+int ts2_cheat_menu_advanced_mode(void)
+{
+    return cm_advanced;
 }
 
 PSX_MOD_CONSTRUCTOR(register_cheat_menu)

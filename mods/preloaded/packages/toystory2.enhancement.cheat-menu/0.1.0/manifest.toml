@@ -43,6 +43,14 @@ description = "Off by default. When on, switching a cheat in the in-game Cheat M
 type = "boolean"
 default = "false"
 
+[[option]]
+feature = "cheat-menu"
+id = "advanced-cheats"
+label = "Allow unverified Action Replay codes (advanced)"
+description = "Off by default. When on, the external cheat file below may also contain unverified Action Replay codes. Only 8-bit (30) and 16-bit (80) writes are accepted, and only inside the game's verified data area; every other code type, address or overlap with a built-in cheat is rejected. Unverified codes always start off and must be switched on in the in-game Cheat Menu. An invalid code can crash the game or damage saved progress, and changes may be saved to the memory card, so use a copy of your memory card. Applies at the next game start."
+type = "boolean"
+default = "false"
+
 [[resource]]
 feature = "cheat-menu"
 id = "cheat-file"

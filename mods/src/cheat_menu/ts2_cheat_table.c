@@ -169,7 +169,8 @@ int ts2_cheat_program_targets_valid(const psxcheat_program *program,
 }
 
 static ts2_cheat_def_status check_def(const ts2_cheat_def *d,
-                                      const psxcheat_psx_range *policy, size_t policy_n)
+                                      const psxcheat_psx_range *policy, size_t policy_n,
+                                      ts2_cheat_trust trust)
 {
     /* Main thread only (activation); static to keep ~3 KiB off the stack. */
     static psxcheat_program program;
@@ -184,12 +185,20 @@ static ts2_cheat_def_status check_def(const ts2_cheat_def *d,
         return TS2_CHEAT_DEF_ERR_LABEL;
     if (!d->code || !d->code[0]) return TS2_CHEAT_DEF_ERR_CODE;
     if (!ranges_shaped(d)) return TS2_CHEAT_DEF_ERR_RANGES;
+    if (trust != TS2_CHEAT_TRUST_SAFE && trust != TS2_CHEAT_TRUST_ADVANCED)
+        return TS2_CHEAT_DEF_ERR_POLICY;
     for (k = 0; k < d->range_count; ++k) {
         int covered = 0;
-        if (!ts2_cheat_range_permitted(d->ranges[k])) return TS2_CHEAT_DEF_ERR_POLICY;
-        for (j = 0; j < policy_n && !covered; ++j)
-            covered = inside(d->ranges[k], policy[j]);
-        if (!covered) return TS2_CHEAT_DEF_ERR_POLICY;
+        if (trust == TS2_CHEAT_TRUST_ADVANCED) {
+            /* Advanced: the fixed data region only, never the verified list. */
+            if (!ts2_cheat_advanced_range_permitted(d->ranges[k]))
+                return TS2_CHEAT_DEF_ERR_POLICY;
+        } else {
+            if (!ts2_cheat_range_permitted(d->ranges[k])) return TS2_CHEAT_DEF_ERR_POLICY;
+            for (j = 0; j < policy_n && !covered; ++j)
+                covered = inside(d->ranges[k], policy[j]);
+            if (!covered) return TS2_CHEAT_DEF_ERR_POLICY;
+        }
         for (j = 0; j < k; ++j)
             if (overlaps(d->ranges[k], d->ranges[j])) return TS2_CHEAT_DEF_ERR_OVERLAP;
     }
@@ -209,6 +218,15 @@ ts2_cheat_table_status ts2_cheat_validate_table(const ts2_cheat_def *defs, size_
                                                 const psxcheat_psx_range *policy,
                                                 size_t policy_n,
                                                 ts2_cheat_def_status *per_def)
+{
+    return ts2_cheat_validate_table_tiered(defs, n, policy, policy_n, NULL, per_def);
+}
+
+ts2_cheat_table_status ts2_cheat_validate_table_tiered(const ts2_cheat_def *defs, size_t n,
+                                                       const psxcheat_psx_range *policy,
+                                                       size_t policy_n,
+                                                       const ts2_cheat_trust *trust,
+                                                       ts2_cheat_def_status *per_def)
 {
     size_t i, j, a, b;
     ts2_cheat_table_status st = TS2_CHEAT_TABLE_OK;
@@ -230,7 +248,9 @@ ts2_cheat_table_status ts2_cheat_validate_table(const ts2_cheat_def *defs, size_
     if (st != TS2_CHEAT_TABLE_OK) return st;
     if (!per_def) return TS2_CHEAT_TABLE_OK;
 
-    for (i = 0; i < n; ++i) per_def[i] = check_def(&defs[i], policy, policy_n);
+    for (i = 0; i < n; ++i)
+        per_def[i] = check_def(&defs[i], policy, policy_n,
+                               trust ? trust[i] : TS2_CHEAT_TRUST_SAFE);
 
     /* Ranges shared between two cheats: isolate both, whatever else is
      * wrong with either (an invalid entry's ranges are not trusted to make

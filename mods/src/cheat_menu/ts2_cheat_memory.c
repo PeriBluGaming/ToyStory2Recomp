@@ -86,6 +86,28 @@ int ts2_cheat_range_permitted(psxcheat_psx_range range)
     return 0;
 }
 
+/* Advanced region (see the header for the evidence). It must stay inside
+ * the D1/D2 candidate area. */
+typedef char ts2_cheat_advanced_in_candidates[
+    (TS2_CHEAT_ADVANCED_START >= TS2_CHEAT_D1_START &&
+     TS2_CHEAT_ADVANCED_END <= TS2_CHEAT_D2_END &&
+     TS2_CHEAT_ADVANCED_START < TS2_CHEAT_ADVANCED_END) ? 1 : -1];
+
+static const psxcheat_psx_range k_advanced[] = {
+    { TS2_CHEAT_ADVANCED_START, TS2_CHEAT_ADVANCED_END },
+};
+
+const psxcheat_psx_range *ts2_cheat_advanced_region(size_t *count)
+{
+    if (count) *count = sizeof k_advanced / sizeof k_advanced[0];
+    return k_advanced;
+}
+
+int ts2_cheat_advanced_range_permitted(psxcheat_psx_range range)
+{
+    return inside(range, TS2_CHEAT_ADVANCED_START, TS2_CHEAT_ADVANCED_END);
+}
+
 int ts2_cheat_config_valid(void)
 {
     size_t i, j;

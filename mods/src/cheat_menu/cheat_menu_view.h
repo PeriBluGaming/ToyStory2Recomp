@@ -53,6 +53,14 @@ extern "C" {
 #define CHEAT_MENU_KEY_RESUME     TS2_CHEAT_KEY_RESUME     /* "cheat_menu.resume" */
 #define CHEAT_MENU_KEY_MAX_COINS  "cheat_menu.max_coins"   /* production row 1 */
 #define CHEAT_MENU_MAX_ROWS       (1u + CHEAT_MENU_MAX_CHEATS)
+/* Phase 3C.4B-3: rows of the Advanced trust tier (ts2_cheat_trust, from the
+ * build -- never from the label or the file) read "<label> (unverified)";
+ * their Off text is CHEAT_MENU_UNVERIFIED_OFF. External labels are at most
+ * 40 bytes, so a marked label (53) stays shorter than a row's description
+ * line ("Off - " + a 64-byte hint) and adds no width. */
+#define CHEAT_MENU_UNVERIFIED_SUFFIX " (unverified)"
+#define CHEAT_MENU_UNVERIFIED_OFF    "Off - unverified code: may crash the game or damage saves"
+#define CHEAT_MENU_LABEL_MAX         80u   /* 64-byte label + suffix + NUL fits */
 
 /* Hand one option value over for the next start. option_id is never NULL;
  * value is "true" or "false". Returns 1 when it was handed over, 0 when it
@@ -82,6 +90,10 @@ typedef struct cheat_menu_view {
      * from it. */
     char row_text[CHEAT_MENU_MAX_CHEATS][96];
     char row_key[CHEAT_MENU_MAX_CHEATS][TS2_CHEAT_KEY_MAX + 1u];
+    /* Phase 3C.4B-3: each row's trust tier, and the marked label of an
+     * Advanced row (other rows point at the table's own label). */
+    ts2_cheat_trust trust[CHEAT_MENU_MAX_CHEATS];
+    char row_label[CHEAT_MENU_MAX_CHEATS][CHEAT_MENU_LABEL_MAX];
     char status_text[128];
     RecompRuntimeUiItem items[CHEAT_MENU_MAX_ROWS];
 } cheat_menu_view;
@@ -95,6 +107,12 @@ void cheat_menu_view_init(cheat_menu_view *v);
  * or duplicate effective menu key (ts2_cheat_validate_menu_keys): Resume
  * only, so no two rows can ever share a key. */
 void cheat_menu_view_init_table(cheat_menu_view *v, const ts2_cheat_def *defs, size_t n);
+/* The same with a trust tier per row (NULL: all SAFE, exactly
+ * cheat_menu_view_init_table). cheat_menu_view_init passes the active
+ * table's tiers (ts2_cheat_active_trust). Any value other than SAFE is shown
+ * as unverified and is never persisted. */
+void cheat_menu_view_init_table_tiered(cheat_menu_view *v, const ts2_cheat_def *defs, size_t n,
+                                       const ts2_cheat_trust *trust);
 
 /* Cheat row of a recomp-ui item: its slot index, or -1 (Resume, unknown). */
 int cheat_menu_view_row_index(const cheat_menu_view *v, const RecompRuntimeUiItem *item);

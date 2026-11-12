@@ -243,6 +243,24 @@ endforeach()
 target_compile_definitions(ts2_cheat_file_integration_runtime_tests PRIVATE
     TS2_CHEAT_RUNTIME_TEST_HEALTH=1)
 
+# Phase 3C.4B-1: Advanced trust tier (validator, engine, guest writes) and a
+# bounded fuzzer checking that no write leaves the Advanced region. The
+# tests also load one TOML buffer (the loader must stay Safe).
+foreach(_at ts2_cheat_advanced_tests ts2_cheat_advanced_fuzz)
+    if(_at STREQUAL "ts2_cheat_advanced_tests")
+        set(_src "${CMAKE_CURRENT_LIST_DIR}/advanced_cheats_tests.c")
+    else()
+        set(_src "${CMAKE_CURRENT_LIST_DIR}/advanced_cheats_fuzz.c")
+    endif()
+    add_executable(${_at} "${_src}"
+        "${CMAKE_CURRENT_LIST_DIR}/psx_runtime_stub.c"
+        "${CMAKE_CURRENT_LIST_DIR}/plugin_stub.c"
+        "${TS2_CHEAT_MENU_DIR}/ts2_cheat_engine.c")
+endforeach()
+target_link_libraries(ts2_cheat_advanced_tests PRIVATE ts2_cheat_file_testlib)
+set_target_properties(ts2_cheat_advanced_tests PROPERTIES LINKER_LANGUAGE CXX)
+target_link_libraries(ts2_cheat_advanced_fuzz PRIVATE psxcheat_psxrecomp_testlib)
+
 # Every executable compiling the real plugin needs the loader (C++ link).
 foreach(_pt ts2_cheat_engine_tests ts2_cheat_menu_persist_tests ts2_cheat_production_tests
             ts2_cheat_external_tests ts2_cheat_health_tests ts2_cheat_health_runtime_tests
@@ -263,7 +281,8 @@ foreach(_t psxcheat_psxrecomp_testlib psxcheat_adapter_tests ts2_cheat_engine_te
            ts2_cheat_production_tests ts2_cheat_external_tests ts2_cheat_health_tests
            ts2_cheat_health_runtime_tests ts2_cheat_lifecycle_tests ts2_cheat_file_tests
            ts2_cheat_file_fuzz ts2_cheat_file_integration_tests
-           ts2_cheat_file_integration_runtime_tests ts2_ranges_check)
+           ts2_cheat_file_integration_runtime_tests ts2_cheat_advanced_tests
+           ts2_cheat_advanced_fuzz ts2_ranges_check)
     set_target_properties(${_t} PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${_t} PRIVATE -Wall -Wextra -Werror)
@@ -292,4 +311,6 @@ add_test(NAME ts2_cheat_file_fuzz COMMAND ts2_cheat_file_fuzz)
 add_test(NAME ts2_cheat_file_integration_tests COMMAND ts2_cheat_file_integration_tests)
 add_test(NAME ts2_cheat_file_integration_runtime_tests
          COMMAND ts2_cheat_file_integration_runtime_tests)
+add_test(NAME ts2_cheat_advanced_tests COMMAND ts2_cheat_advanced_tests)
+add_test(NAME ts2_cheat_advanced_fuzz COMMAND ts2_cheat_advanced_fuzz)
 add_test(NAME ts2_ranges_check COMMAND ts2_ranges_check)

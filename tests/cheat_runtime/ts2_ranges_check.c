@@ -118,6 +118,27 @@ int main(void)
         CHECK(count_overlaps(explicit_ranges[i].start, explicit_ranges[i].end,
                              KNOWN_MISCLASSIFIED_D1, NULL) == 0);
 
+    /* Phase 3C.4B-1: the Advanced region overlaps no code range except the
+     * known misclassified data block, starts above the last EXE code range
+     * and is exactly one entry. */
+    {
+        size_t na = 0;
+        uint64_t code_end = 0;
+        const psxcheat_psx_range *adv = ts2_cheat_advanced_region(&na);
+        CHECK(na == 1u && adv != NULL);
+        CHECK(adv && adv[0].start == TS2_CHEAT_ADVANCED_START &&
+              adv[0].end == TS2_CHEAT_ADVANCED_END);
+        CHECK(count_overlaps(TS2_CHEAT_ADVANCED_START, TS2_CHEAT_ADVANCED_END,
+                             KNOWN_MISCLASSIFIED_D1, NULL) == 0);
+        for (i = 0; i < g_count; ++i)
+            if (g_ranges[i].lo != KNOWN_MISCLASSIFIED_D1 &&
+                (uint64_t)g_ranges[i].lo + g_ranges[i].len > code_end)
+                code_end = (uint64_t)g_ranges[i].lo + g_ranges[i].len;
+        CHECK(code_end == 0x80097DC8u);             /* last real code range */
+        CHECK(code_end <= TS2_CHEAT_ADVANCED_START);
+        CHECK(!ts2_cheat_advanced_range_permitted((psxcheat_psx_range){ 0x80067440u, 0x80067444u }));
+    }
+
     /* Sanity: hook sites used by existing mods are code in the manifest and
      * outside both candidate regions. */
     CHECK(inside_some_range(0x80067440u));  /* camera target update */

@@ -18,6 +18,10 @@ extern "C" {
 /* Launcher resource (manifest [[resource]], format "file"): the optional
  * external cheat file (ts2_cheat_file.h), read once per activation. */
 #define TS2_CHEAT_FILE_RESOURCE_ID "cheat-file"
+/* Launcher option (Phase 3C.4B-2): load the cheat file in Advanced mode
+ * (ts2_cheat_external.h). Read once per activation; never persisted by the
+ * in-game menu, never applied live. */
+#define TS2_CHEAT_ADVANCED_OPTION "advanced-cheats"
 
 struct PsxMenuProvider;
 struct ts2_cheat_file_report;
@@ -36,6 +40,11 @@ int ts2_cheat_menu_remember_changes(void);
  * ignores it). Written only during activation (main thread); read-only
  * afterwards. Holds statuses and counts only, never file content. */
 const struct ts2_cheat_file_report *ts2_cheat_menu_file_report(void);
+
+/* 1 when the last activation selected Advanced mode ("advanced-cheats" read
+ * exactly "true"); 0 otherwise, and always 0 in a runtime health test build
+ * (which loads no cheat file). Main thread after activation. */
+int ts2_cheat_menu_advanced_mode(void);
 
 /* The in-game menu provider (cheat_menu_provider.cpp). */
 const struct PsxMenuProvider *ts2_cheat_menu_provider(void);

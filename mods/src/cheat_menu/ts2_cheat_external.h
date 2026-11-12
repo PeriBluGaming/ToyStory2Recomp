@@ -35,7 +35,8 @@
  *
  * External cheats are session-only: their start state comes from the input
  * (the file), and the Cheat Menu never persists them (see
- * ts2_cheat_def_is_external).
+ * ts2_cheat_def_is_external). Advanced-tier entries (see
+ * ts2_cheat_ext_mode below) always start off.
  *
  * Threading: build on the main thread during activation, before the engine
  * and the menu are set up.
@@ -134,6 +135,47 @@ ts2_cheat_build_status ts2_cheat_combined_build_with(
 /* Production: built-in table, verified list, external policy. */
 ts2_cheat_build_status ts2_cheat_combined_build(const ts2_cheat_external_input *inputs,
                                                 size_t n, ts2_cheat_ext_status *status);
+
+/* Trust modes (Phase 3C.4B-1). The CALLER chooses the mode; an input record
+ * has no tier field, so file content can never raise it.
+ *   SAFE (the default everywhere above): exactly the behaviour described at
+ *     the top -- every span inside the external policy.
+ *   ADVANCED: an entry the Safe policy accepts stays SAFE (same checks, same
+ *     start state). An entry rejected ONLY because a span is outside the
+ *     external policy is checked again against the fixed Advanced region
+ *     (ts2_cheat_advanced_region, ts2_cheat_memory.h): when every span lies
+ *     inside it, the entry is accepted as TS2_CHEAT_TRUST_ADVANCED, its spans
+ *     merged within that one region (duplicates and touching lines merge as
+ *     before), and it ALWAYS starts off, whatever its `enabled` says. Every
+ *     other check is unchanged: supported code types (30/80), 2 MiB RAM
+ *     offsets, id/label/description, built-in overlap (that entry), overlap
+ *     between external entries (both), duplicate ids, capacity, and the
+ *     final tiered table validation (defence in depth). */
+typedef enum ts2_cheat_ext_mode {
+    TS2_CHEAT_EXT_MODE_SAFE = 0,
+    TS2_CHEAT_EXT_MODE_ADVANCED = 1
+} ts2_cheat_ext_mode;
+
+/* ts2_cheat_combined_build_with plus a mode; trust[0..n) (may be NULL)
+ * receives each accepted input's tier (SAFE for every other input). Any
+ * other mode value: TS2_CHEAT_BUILD_ERR_POLICY, built-ins only. */
+ts2_cheat_build_status ts2_cheat_combined_build_with_mode(
+    const ts2_cheat_def *builtins, size_t builtin_count,
+    const psxcheat_psx_range *verified, size_t verified_count,
+    const psxcheat_psx_range *external_policy, size_t external_policy_count,
+    ts2_cheat_ext_mode mode,
+    const ts2_cheat_external_input *inputs, size_t n,
+    ts2_cheat_ext_status *status, ts2_cheat_trust *trust);
+
+/* Production tables with a mode. */
+ts2_cheat_build_status ts2_cheat_combined_build_mode(const ts2_cheat_external_input *inputs,
+                                                     size_t n, ts2_cheat_ext_mode mode,
+                                                     ts2_cheat_ext_status *status,
+                                                     ts2_cheat_trust *trust);
+
+/* Tier of active-table entry `index`: the build's verdict for external
+ * entries, TS2_CHEAT_TRUST_SAFE for built-ins and out of range. */
+ts2_cheat_trust ts2_cheat_active_trust(size_t index);
 
 /* The table the engine and the menu use: the combined table once built,
  * else the built-in table. Immutable after activation. */

@@ -25,6 +25,7 @@ typedef struct ext_store {
     psxcheat_psx_range ranges[TS2_CHEAT_EXT_LINES_MAX];
     size_t range_count;
     int enabled;
+    ts2_cheat_trust trust;          /* assigned by the build, never by the input */
 } ext_store;
 
 static struct {
@@ -49,6 +50,7 @@ static struct {
     ts2_cheat_ext_status status[TS2_CHEAT_EXTERNAL_INPUT_MAX];
     psxcheat_psx_range ranges[TS2_CHEAT_EXTERNAL_INPUT_MAX][TS2_CHEAT_EXT_LINES_MAX];
     size_t range_count[TS2_CHEAT_EXTERNAL_INPUT_MAX];
+    ts2_cheat_trust trust[TS2_CHEAT_EXTERNAL_INPUT_MAX];
 } g_scratch;
 
 /* ---- Helpers ----------------------------------------------------------------- */
@@ -148,13 +150,16 @@ static long policy_index(const psxcheat_psx_range *policy, size_t np, psxcheat_p
 /* Validate one input on its own; fills the scratch spans for slot i. */
 static ts2_cheat_ext_status check_input(const ts2_cheat_external_input *in, size_t i,
                                         const ts2_cheat_def *builtins, size_t nb,
-                                        const psxcheat_psx_range *policy, size_t np)
+                                        const psxcheat_psx_range *policy, size_t np,
+                                        ts2_cheat_ext_mode mode)
 {
     psxcheat_psx_range spans[TS2_CHEAT_EXT_LINES_MAX];
     long owner[TS2_CHEAT_EXT_LINES_MAX];
     size_t k, j, count = 0, merged = 0;
+    int safe = 1, advanced = 1;     /* every span inside policy / region */
 
     g_scratch.range_count[i] = 0;
+    g_scratch.trust[i] = TS2_CHEAT_TRUST_SAFE;
     if (!valid_id(in->id)) return TS2_CHEAT_EXT_ERR_ID;
     for (k = 0; k < nb; ++k)
         if (builtins[k].id && strcmp(builtins[k].id, in->id) == 0)
@@ -184,8 +189,22 @@ static ts2_cheat_ext_status check_input(const ts2_cheat_external_input *in, size
         if (span.start == 0u) return TS2_CHEAT_EXT_ERR_TARGET;
         span.end = span.start + width;
         owner[count] = policy_index(policy, np, span);
-        if (owner[count] < 0) return TS2_CHEAT_EXT_ERR_TARGET;
+        if (owner[count] < 0) {
+            /* Safe mode: rejected at the first such line, as always. */
+            if (mode != TS2_CHEAT_EXT_MODE_ADVANCED || !ts2_cheat_advanced_range_permitted(span))
+                return TS2_CHEAT_EXT_ERR_TARGET;
+            safe = 0;
+        }
+        if (!ts2_cheat_advanced_range_permitted(span)) advanced = 0;
         spans[count++] = span;
+    }
+    if (!safe) {
+        /* Outside the external policy: only Advanced mode may accept it,
+         * and only when every span lies inside the fixed Advanced region
+         * (then one owner: spans merge within the region). */
+        if (mode != TS2_CHEAT_EXT_MODE_ADVANCED || !advanced) return TS2_CHEAT_EXT_ERR_TARGET;
+        for (k = 0; k < count; ++k) owner[k] = 0;
+        g_scratch.trust[i] = TS2_CHEAT_TRUST_ADVANCED;
     }
     /* Sort by start (insertion sort, <= 32 entries), then merge spans that
      * touch or overlap within the same policy entry. */
@@ -258,7 +277,10 @@ static void store_external(const ts2_cheat_external_input *in, size_t i, size_t 
     }
     for (k = 0; k < g_scratch.range_count[i]; ++k) s->ranges[k] = g_scratch.ranges[i][k];
     s->range_count = g_scratch.range_count[i];
-    s->enabled = in->enabled != 0;
+    s->trust = g_scratch.trust[i];
+    /* Advanced (unverified) entries never start on (the engine enforces it
+     * again on its own). */
+    s->enabled = s->trust == TS2_CHEAT_TRUST_SAFE && in->enabled != 0;
 
     memset(d, 0, sizeof *d);
     d->id = s->id;
@@ -280,6 +302,24 @@ static void copy_verdicts(ts2_cheat_ext_status *status, size_t looked)
         for (i = 0; i < looked; ++i) status[i] = g_scratch.status[i];
 }
 
+static void copy_trust(ts2_cheat_trust *trust, size_t looked)
+{
+    size_t i;
+    if (trust)
+        for (i = 0; i < looked; ++i)
+            trust[i] = g_scratch.status[i] == TS2_CHEAT_EXT_OK ? g_scratch.trust[i]
+                                                               : TS2_CHEAT_TRUST_SAFE;
+}
+
+/* Tiers of the current combined table (built-ins SAFE). */
+static void table_trust(ts2_cheat_trust *out)
+{
+    size_t i;
+    for (i = 0; i < TS2_CHEAT_MAX; ++i) out[i] = TS2_CHEAT_TRUST_SAFE;
+    for (i = g_comb.builtin_count; i < g_comb.count && i < TS2_CHEAT_MAX; ++i)
+        out[i] = g_comb.ext[i - g_comb.builtin_count].trust;
+}
+
 ts2_cheat_build_status ts2_cheat_combined_build_with(
     const ts2_cheat_def *builtins, size_t nb,
     const psxcheat_psx_range *verified, size_t nv,
@@ -287,7 +327,20 @@ ts2_cheat_build_status ts2_cheat_combined_build_with(
     const ts2_cheat_external_input *inputs, size_t n,
     ts2_cheat_ext_status *status)
 {
+    return ts2_cheat_combined_build_with_mode(builtins, nb, verified, nv, policy, np,
+                                              TS2_CHEAT_EXT_MODE_SAFE, inputs, n, status, NULL);
+}
+
+ts2_cheat_build_status ts2_cheat_combined_build_with_mode(
+    const ts2_cheat_def *builtins, size_t nb,
+    const psxcheat_psx_range *verified, size_t nv,
+    const psxcheat_psx_range *policy, size_t np,
+    ts2_cheat_ext_mode mode,
+    const ts2_cheat_external_input *inputs, size_t n,
+    ts2_cheat_ext_status *status, ts2_cheat_trust *trust)
+{
     ts2_cheat_def_status per[TS2_CHEAT_MAX];
+    ts2_cheat_trust tiers[TS2_CHEAT_MAX];
     size_t i, j, room;
     const size_t looked = !inputs ? 0u :
         n < TS2_CHEAT_EXTERNAL_INPUT_MAX ? n : TS2_CHEAT_EXTERNAL_INPUT_MAX;
@@ -295,6 +348,8 @@ ts2_cheat_build_status ts2_cheat_combined_build_with(
 
     if (status)
         for (i = 0; i < n; ++i) status[i] = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
+    if (trust)
+        for (i = 0; i < n; ++i) trust[i] = TS2_CHEAT_TRUST_SAFE;
     /* The engine or the menu may hold pointers into the table: refuse and
      * change nothing (not even the scratch verdicts). */
     if (g_life.sealed || g_life.refs) return TS2_CHEAT_BUILD_ERR_SEALED;
@@ -313,10 +368,13 @@ ts2_cheat_build_status ts2_cheat_combined_build_with(
             return TS2_CHEAT_BUILD_ERR_POLICY;   /* external key namespace is reserved */
     }
     if (!external_policy_valid(verified, nv, policy, np)) return TS2_CHEAT_BUILD_ERR_POLICY;
+    if (mode != TS2_CHEAT_EXT_MODE_SAFE && mode != TS2_CHEAT_EXT_MODE_ADVANCED)
+        return TS2_CHEAT_BUILD_ERR_POLICY;
     if (looked == 0u) return TS2_CHEAT_BUILD_OK;   /* zero external cheats */
 
     /* 1. Each entry on its own; entries beyond the input limit: capacity. */
-    for (i = 0; i < looked; ++i) st[i] = check_input(&inputs[i], i, builtins, nb, policy, np);
+    for (i = 0; i < looked; ++i)
+        st[i] = check_input(&inputs[i], i, builtins, nb, policy, np, mode);
     if (status)
         for (i = looked; i < n; ++i) status[i] = TS2_CHEAT_EXT_ERR_CAPACITY;
     /* 2. Ids shared by several otherwise valid entries: reject all of them. */
@@ -356,8 +414,10 @@ ts2_cheat_build_status ts2_cheat_combined_build_with(
         store_external(&inputs[i], i, g_comb.external_count);
     }
     /* 6. Defence in depth: the combined table must pass the trusted table
-     * validation entry by entry; otherwise fall back to the built-ins. */
-    if (ts2_cheat_validate_table(g_comb.table, g_comb.count, verified, nv, per) !=
+     * validation entry by entry, each against its own tier; otherwise fall
+     * back to the built-ins. */
+    table_trust(tiers);
+    if (ts2_cheat_validate_table_tiered(g_comb.table, g_comb.count, verified, nv, tiers, per) !=
         TS2_CHEAT_TABLE_OK) {
         for (i = 0; i < looked; ++i)
             if (st[i] == TS2_CHEAT_EXT_OK) st[i] = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
@@ -374,6 +434,7 @@ ts2_cheat_build_status ts2_cheat_combined_build_with(
         return TS2_CHEAT_BUILD_ERR_INTERNAL;
     }
     copy_verdicts(status, looked);
+    copy_trust(trust, looked);
     return TS2_CHEAT_BUILD_OK;
 }
 
@@ -385,6 +446,26 @@ ts2_cheat_build_status ts2_cheat_combined_build(const ts2_cheat_external_input *
     const psxcheat_psx_range *v = ts2_cheat_writable_ranges(&nv);
     const psxcheat_psx_range *p = ts2_cheat_external_policy(&np);
     return ts2_cheat_combined_build_with(b, nb, v, nv, p, np, inputs, n, status);
+}
+
+ts2_cheat_build_status ts2_cheat_combined_build_mode(const ts2_cheat_external_input *inputs,
+                                                     size_t n, ts2_cheat_ext_mode mode,
+                                                     ts2_cheat_ext_status *status,
+                                                     ts2_cheat_trust *trust)
+{
+    size_t nb = 0, nv = 0, np = 0;
+    const ts2_cheat_def *b = ts2_cheat_table(&nb);
+    const psxcheat_psx_range *v = ts2_cheat_writable_ranges(&nv);
+    const psxcheat_psx_range *p = ts2_cheat_external_policy(&np);
+    return ts2_cheat_combined_build_with_mode(b, nb, v, nv, p, np, mode, inputs, n, status,
+                                              trust);
+}
+
+ts2_cheat_trust ts2_cheat_active_trust(size_t index)
+{
+    if (!g_comb.built || index < g_comb.builtin_count || index >= g_comb.count)
+        return TS2_CHEAT_TRUST_SAFE;
+    return g_comb.ext[index - g_comb.builtin_count].trust;
 }
 
 const psxcheat_psx_range *ts2_cheat_active_verified(size_t *count)

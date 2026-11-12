@@ -68,6 +68,41 @@ int ts2_cheat_config_valid(void);
  * an external cheat can actually use. Addresses only: no value checks. */
 const psxcheat_psx_range *ts2_cheat_external_policy(size_t *count);
 
+/* ADVANCED region (Phase 3C.4B-1): the one data window an external cheat of
+ * the Advanced trust tier (ts2_cheat_table.h, ts2_cheat_trust) may write.
+ * It is NOT part of the verified list above, never configures the built-in
+ * adapter, and changes nothing for Safe entries. Only the caller of the
+ * external build selects Advanced mode (never file content), and only for
+ * entries the Safe policy rejects; their writes stay inside this region and
+ * inside each cheat's own derived spans. Evidence (static, disc/SLUS_008.93
+ * and the overlay caches of earlier runs):
+ *  - EXE image 0x80010000..0x800A1800 (header t_size 0x91800, no b_size);
+ *    recompiled code ranges end at 0x80097DC8; the only manifest entry in
+ *    the region is the known misclassified data block at 0x800A04C8
+ *    (ts2_ranges_check); no j/jal in the EXE targets the region.
+ *  - Startup __start (0x80082D60) clears BSS [0x800A1070, 0x800D12C0) and
+ *    calls InitHeap (A0:39, 0x80089344) with heap [0x800D12C4, 0x801F8000)
+ *    (2 MiB - stack 0x8000, word 0x800A0764); stack above, sp from RAM top.
+ *  - Code overlays load at or above _end: level overlays at 0x800D12C0
+ *    (0x8003DEA4), bits\memory.bin and fmv\fmv.bin at 0x800D5D20. Files
+ *    read into the region are data (PAD\PATHnn.BIN at 0x800BA0C8, *.vh at
+ *    0x800BB8D8). All 612 cached overlay code ranges lie below 0x800A04C8
+ *    (kernel / EXE pages) or at/above 0x800D6000.
+ *  - gp data (2194 gp-relative accesses) spans 0x800A0CE0..0x800A8AAE.
+ * So [0x800A04C8, 0x800D0000) is image data (.sdata) and BSS; it ends
+ * 0x12C0 below the heap. It holds pointer tables, buffers and game state:
+ * a bad value can break or crash the game (and reach memory card saves),
+ * but no write can reach code, overlays, heap, stack, kernel or host
+ * memory. Not verified: destinations computed at run time (.all, .anm,
+ * level.dat loads) -- data files in any case. */
+#define TS2_CHEAT_ADVANCED_START 0x800A04C8u
+#define TS2_CHEAT_ADVANCED_END   0x800D0000u
+
+/* The Advanced region as a one-entry list (count via *count). */
+const psxcheat_psx_range *ts2_cheat_advanced_region(size_t *count);
+/* 1 when `range` is non-empty and lies inside the Advanced region. */
+int ts2_cheat_advanced_range_permitted(psxcheat_psx_range range);
+
 /* Adapter configuration for TS2: the explicit list, read-back on. Returns 0
  * (leaving *out describing no writable range) when the list is invalid. */
 int ts2_cheat_adapter_config(psxcheat_psx_config *out);

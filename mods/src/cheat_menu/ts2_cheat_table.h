@@ -102,6 +102,26 @@ ts2_cheat_table_status ts2_cheat_validate_table(const ts2_cheat_def *defs, size_
                                                 size_t policy_n,
                                                 ts2_cheat_def_status *per_def);
 
+/* Trust tier of one table entry (Phase 3C.4B-1). SAFE: every range passes
+ * ts2_cheat_range_permitted and lies inside the policy list -- all built-in
+ * cheats and every external entry the Safe policy accepts. ADVANCED: an
+ * external entry accepted only in Advanced mode; every range must lie
+ * inside ts2_cheat_advanced_region() (a source-code constant, checked here
+ * independently of the external validator). The tier never comes from
+ * file content. Any other value is rejected (TS2_CHEAT_DEF_ERR_POLICY). */
+typedef enum ts2_cheat_trust {
+    TS2_CHEAT_TRUST_SAFE = 0,
+    TS2_CHEAT_TRUST_ADVANCED = 1
+} ts2_cheat_trust;
+
+/* ts2_cheat_validate_table with a tier per entry: trust[0..n) (NULL: all
+ * SAFE, exactly ts2_cheat_validate_table). Pure. */
+ts2_cheat_table_status ts2_cheat_validate_table_tiered(const ts2_cheat_def *defs, size_t n,
+                                                       const psxcheat_psx_range *policy,
+                                                       size_t policy_n,
+                                                       const ts2_cheat_trust *trust,
+                                                       ts2_cheat_def_status *per_def);
+
 /* The effective menu key of `d` (explicit menu_key, else "cheat_menu.<id>")
  * into out[0..n). Returns 1 when it fits and is a valid key (prefix, at
  * least one more character, [A-Za-z0-9._-] only, at most TS2_CHEAT_KEY_MAX

@@ -110,6 +110,17 @@ ts2_cheat_table_status ts2_cheat_engine_init_table(const ts2_cheat_def *defs, si
                                                    const psxcheat_psx_range *policy,
                                                    size_t policy_n,
                                                    const int *enabled);
+
+/* The same with a trust tier per entry (trust NULL: all SAFE, exactly
+ * ts2_cheat_engine_init_table). The engine validates every entry against
+ * its own tier (ts2_cheat_validate_table_tiered) and starts every ADVANCED
+ * slot OFF whatever enabled[] says: an unverified cheat is only ever
+ * switched on by an explicit set_enabled (the menu). */
+ts2_cheat_table_status ts2_cheat_engine_init_table_tiered(const ts2_cheat_def *defs, size_t n,
+                                                          const psxcheat_psx_range *policy,
+                                                          size_t policy_n,
+                                                          const ts2_cheat_trust *trust,
+                                                          const int *enabled);
 ts2_cheat_table_status ts2_cheat_engine_table_status(void);
 /* Number of slots (table entries; 0 before setup or after a table error). */
 size_t ts2_cheat_engine_count(void);

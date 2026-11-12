@@ -63,7 +63,10 @@
  *
  * Diagnostics: status enums and fixed texts only (ts2_cheat_file_describe /
  * _describe_entry); file content is never echoed. A syntax error reports
- * its line number at most.
+ * its line number at most. In Advanced mode the summary also counts the
+ * unverified (Advanced-tier) entries, and an accepted Advanced entry reads
+ * "ok, unverified" (plus "enabled ignored, starts off" when its file
+ * `enabled` was true).
  *
  * Threading: main thread, activation only (like combined_build). No C++
  * exception crosses this interface. */
@@ -125,6 +128,12 @@ typedef struct ts2_cheat_file_report {
     uint32_t error_line;            /* TOML syntax error line, 0 when unknown */
     ts2_cheat_entry_shape shape[TS2_CHEAT_EXTERNAL_INPUT_MAX];
     ts2_cheat_ext_status verdict[TS2_CHEAT_EXTERNAL_INPUT_MAX];  /* per file entry */
+    /* Phase 3C.4B-2: trust mode (chosen by the caller, never by the file). */
+    ts2_cheat_ext_mode mode;
+    size_t unverified;              /* accepted entries of the Advanced tier */
+    size_t enabled_ignored;         /* of those: `enabled = true` ignored (start off) */
+    ts2_cheat_trust trust[TS2_CHEAT_EXTERNAL_INPUT_MAX];      /* SAFE unless accepted Advanced */
+    unsigned char requested_on[TS2_CHEAT_EXTERNAL_INPUT_MAX]; /* the entry's `enabled` */
 } ts2_cheat_file_report;
 
 /* Load `path_utf8` (NULL or empty: TS2_CHEAT_FILE_NONE) and build the
@@ -136,6 +145,19 @@ ts2_cheat_file_status ts2_cheat_file_load(const char *path_utf8, ts2_cheat_file_
  * bytes; the size limit applies. */
 ts2_cheat_file_status ts2_cheat_file_load_buffer(const unsigned char *data, size_t size,
                                                  ts2_cheat_file_report *report);
+
+/* Phase 3C.4B-2: the same with a trust mode (ts2_cheat_external.h). The
+ * two functions above are TS2_CHEAT_EXT_MODE_SAFE. Only the caller (the
+ * plugin, from the launcher option) chooses ADVANCED; the file format has
+ * no field for it. In ADVANCED mode entries the Safe policy rejects only
+ * for their target may be accepted inside the verified Advanced region;
+ * they always start off. An unknown mode value: TS2_CHEAT_FILE_ERR_INTERNAL
+ * (built-ins only). */
+ts2_cheat_file_status ts2_cheat_file_load_mode(const char *path_utf8, ts2_cheat_ext_mode mode,
+                                               ts2_cheat_file_report *report);
+ts2_cheat_file_status ts2_cheat_file_load_buffer_mode(const unsigned char *data, size_t size,
+                                                      ts2_cheat_ext_mode mode,
+                                                      ts2_cheat_file_report *report);
 
 const char *ts2_cheat_file_status_name(ts2_cheat_file_status status);
 const char *ts2_cheat_entry_shape_name(ts2_cheat_entry_shape shape);

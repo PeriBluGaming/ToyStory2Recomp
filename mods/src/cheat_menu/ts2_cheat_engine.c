@@ -71,11 +71,20 @@ ts2_cheat_table_status ts2_cheat_engine_init_table(const ts2_cheat_def *defs, si
                                                    size_t policy_n,
                                                    const int *enabled)
 {
+    return ts2_cheat_engine_init_table_tiered(defs, n, policy, policy_n, NULL, enabled);
+}
+
+ts2_cheat_table_status ts2_cheat_engine_init_table_tiered(const ts2_cheat_def *defs, size_t n,
+                                                          const psxcheat_psx_range *policy,
+                                                          size_t policy_n,
+                                                          const ts2_cheat_trust *trust,
+                                                          const int *enabled)
+{
     ts2_cheat_def_status per_def[TS2_CHEAT_MAX];
     size_t i;
 
     memset(&g_engine, 0, sizeof g_engine);
-    g_engine.table = ts2_cheat_validate_table(defs, n, policy, policy_n, per_def);
+    g_engine.table = ts2_cheat_validate_table_tiered(defs, n, policy, policy_n, trust, per_def);
     if (g_engine.table != TS2_CHEAT_TABLE_OK) return g_engine.table;  /* no slot */
     g_engine.defs = defs;
     g_engine.count = n;
@@ -97,7 +106,10 @@ ts2_cheat_table_status ts2_cheat_engine_init_table(const ts2_cheat_def *defs, si
             }
             continue;
         }
-        if (setup_slot(s, &defs[i])) s->enabled = enabled && enabled[i] != 0;
+        /* Advanced (unverified) entries never start on. */
+        if (setup_slot(s, &defs[i]))
+            s->enabled = enabled && enabled[i] != 0 &&
+                         !(trust && trust[i] == TS2_CHEAT_TRUST_ADVANCED);
     }
     return g_engine.table;
 }
@@ -124,10 +136,15 @@ void ts2_cheat_engine_activate(void)
     const size_t builtins = ts2_cheat_active_builtin_count();
     const psxcheat_psx_range *policy = ts2_cheat_active_verified(&policy_n);
     int initial[TS2_CHEAT_MAX];
+    ts2_cheat_trust trust[TS2_CHEAT_MAX];
     memset(initial, 0, sizeof initial);
+    for (i = 0; i < TS2_CHEAT_MAX; ++i) trust[i] = TS2_CHEAT_TRUST_SAFE;
     for (i = 0; i < n && i < TS2_CHEAT_MAX; ++i) {
         char value[16];
         if (i >= builtins) {
+            /* Built-ins are always SAFE; an external entry's tier is the one
+             * the build assigned (never file content). */
+            trust[i] = ts2_cheat_active_trust(i);
             initial[i] = ts2_cheat_active_external_enabled(i);
             continue;
         }
@@ -135,7 +152,7 @@ void ts2_cheat_engine_activate(void)
             psx_mod_current_option_value(defs[i].id, value, sizeof value) &&
             strcmp(value, "true") == 0;
     }
-    (void)ts2_cheat_engine_init_table(defs, n, policy, policy_n, initial);
+    (void)ts2_cheat_engine_init_table_tiered(defs, n, policy, policy_n, trust, initial);
     /* From here the engine points into the active table: no rebuild until
      * the next session (ts2_cheat_external.h). */
     ts2_cheat_session_seal();

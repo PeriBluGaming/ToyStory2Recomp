@@ -58,7 +58,8 @@ static void refresh_text(cheat_menu_view *v, size_t i)
     const cheat_menu_snapshot s = v->state.snapshots[i];
     switch (v->bound[i] ? s.state : TS2_CHEAT_UNAVAILABLE) {
     case TS2_CHEAT_OFF:
-        if (d->off_hint) snprintf(out, n, "Off - %s", d->off_hint);
+        if (v->trust[i] != TS2_CHEAT_TRUST_SAFE) snprintf(out, n, "%s", CHEAT_MENU_UNVERIFIED_OFF);
+        else if (d->off_hint) snprintf(out, n, "Off - %s", d->off_hint);
         else snprintf(out, n, "Off");
         break;
     case TS2_CHEAT_ARMED:
@@ -80,6 +81,12 @@ static void refresh_text(cheat_menu_view *v, size_t i)
 
 void cheat_menu_view_init_table(cheat_menu_view *v, const ts2_cheat_def *defs, size_t n)
 {
+    cheat_menu_view_init_table_tiered(v, defs, n, NULL);
+}
+
+void cheat_menu_view_init_table_tiered(cheat_menu_view *v, const ts2_cheat_def *defs, size_t n,
+                                       const ts2_cheat_trust *trust)
+{
     size_t i;
     if (!v) return;
     memset(v, 0, sizeof *v);
@@ -94,19 +101,29 @@ void cheat_menu_view_init_table(cheat_menu_view *v, const ts2_cheat_def *defs, s
     v->cheat_count = n;
     for (i = 0; i < n; ++i) {
         const ts2_cheat_def *d = &defs[i];
+        const char *label = d->label ? d->label : (d->id ? d->id : "Cheat");
         (void)ts2_cheat_menu_key(d, v->row_key[i], sizeof v->row_key[i]);  /* validated above */
-        set_item(&v->items[1 + i], v->row_key[i],
-                 d->label ? d->label : (d->id ? d->id : "Cheat"),
-                 v->row_text[i], RECOMP_RUNTIME_UI_BOOL);
+        /* Fail closed: anything but SAFE is presented as unverified. */
+        v->trust[i] = trust && trust[i] != TS2_CHEAT_TRUST_SAFE ? TS2_CHEAT_TRUST_ADVANCED
+                                                                : TS2_CHEAT_TRUST_SAFE;
+        if (v->trust[i] != TS2_CHEAT_TRUST_SAFE) {
+            snprintf(v->row_label[i], sizeof v->row_label[i], "%s%s", label,
+                     CHEAT_MENU_UNVERIFIED_SUFFIX);
+            label = v->row_label[i];
+        }
+        set_item(&v->items[1 + i], v->row_key[i], label, v->row_text[i], RECOMP_RUNTIME_UI_BOOL);
         refresh_text(v, i);
     }
 }
 
 void cheat_menu_view_init(cheat_menu_view *v)
 {
-    size_t n = 0;
+    size_t n = 0, i;
+    ts2_cheat_trust trust[CHEAT_MENU_MAX_CHEATS];
     const ts2_cheat_def *defs = ts2_cheat_active_table(&n);
-    cheat_menu_view_init_table(v, defs, n);
+    for (i = 0; i < CHEAT_MENU_MAX_CHEATS; ++i)
+        trust[i] = i < n ? ts2_cheat_active_trust(i) : TS2_CHEAT_TRUST_SAFE;
+    cheat_menu_view_init_table_tiered(v, defs, n, trust);
 }
 
 const RecompRuntimeUiItem *cheat_menu_view_items(const cheat_menu_view *v, size_t *count)
@@ -202,7 +219,9 @@ int cheat_menu_view_sync(cheat_menu_view *v)
     for (i = 0; i < v->cheat_count; ++i) {
         const char *value;
         if (!(v->state.applied_mask & (1u << i)) || !v->bound[i]) continue;
-        if (ts2_cheat_def_is_external(&v->defs[i])) {   /* session-only */
+        /* Session-only: external rows, and (independently) every
+         * unverified row, whatever table it came from. */
+        if (ts2_cheat_def_is_external(&v->defs[i]) || v->trust[i] != TS2_CHEAT_TRUST_SAFE) {
             session = 1;
             continue;
         }
