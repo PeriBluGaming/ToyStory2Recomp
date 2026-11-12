@@ -71,6 +71,18 @@ int psx_mod_current_option_value(const char *option_id, char *out, uint32_t out_
     return 1;
 }
 
+int psx_mod_current_resource_path(const char *resource_id, char *out, uint32_t out_size)
+{
+    const char *value = NULL;
+    ++g_plugin.resource_reads;
+    if (out && out_size) out[0] = '\0';
+    if (!resource_id || !resource_id[0] || !out || out_size == 0) return 0;
+    if (strcmp(resource_id, TS2_CHEAT_FILE_RESOURCE_ID) == 0) value = g_plugin.resource_path;
+    if (!value || !value[0] || strlen(value) + 1u > out_size) return 0;
+    strcpy(out, value);
+    return 1;
+}
+
 int psx_menu_set_provider(const PsxMenuProvider *provider)
 {
     ++g_plugin.provider_sets;

@@ -2,15 +2,15 @@
  * SPDX-FileCopyrightText: 2026 PeriBluGaming */
 #include "cheat_menu.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "mod_plugins.h"
 #include "psx_menu_host.h"
 #include "ts2_cheat_engine.h"
 #include "ts2_cheat_external.h"
+#include "ts2_cheat_file.h"
 #if defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
-#include <stdio.h>
-
 #include "ts2_cheat_memory.h"   /* TS2_CHEAT_HEALTH_RECOMMENDED */
 #endif
 
@@ -44,8 +44,28 @@
  * Activation order (main thread, after the previous session was torn down:
  * provider detached, no VBlank): engine shutdown (drops its table pointer),
  * ts2_cheat_session_begin (fresh table window; refused while the menu still
- * holds a table reference), optional builds, engine activation (seals the
+ * holds a table reference), at most ONE build, engine activation (seals the
  * table for the session). See ts2_cheat_external.h.
+ *
+ * External cheat file (Phase 3C.3A). The launcher resource "cheat-file" is
+ * resolved here (psx_mod_current_resource_path answers only in this
+ * context). With no file selected nothing is built and nothing is printed:
+ * the built-in table is used exactly as before. With a file selected,
+ * ts2_cheat_file_load() is the session's single build: it refuses (and
+ * opens nothing) unless the window is fresh, unsealed and unreferenced, and
+ * otherwise builds once -- built-ins plus the accepted entries, or built-ins
+ * only on any file-level error. A one-line summary and one line per
+ * rejected entry go to stdout, from fixed texts and numbers only (never
+ * file content or the path). External cheats start in the file's `enabled`
+ * state and stay session-only: the menu never persists them and nothing
+ * writes to the file. The file is read once per activation; there is no
+ * reload while the game runs.
+ *
+ * Runtime health test build (-DTS2_CHEAT_RUNTIME_TEST_HEALTH=ON, developer
+ * only, default OFF): the synthetic "TEST Full Health" entry is the
+ * session's build and the external cheat file is NOT loaded (a selected
+ * file is reported as ignored), so that test always runs on exactly one
+ * known external entry.
  *
  * "remember-changes" is read here, in the plugin's activation context (the
  * only place psx_mod_current_option_value answers for this feature). Only
@@ -53,6 +73,12 @@
 
 static volatile int cm_activated;
 static volatile int cm_remember;
+/* Last activation's cheat file result; cm_file_loaded = 0: none. */
+static ts2_cheat_file_report cm_file;
+static int cm_file_loaded;
+/* Selected path (UTF-8). A path longer than this reads as "none selected"
+ * (psx_mod_current_resource_path cannot tell the two apart). */
+static char cm_file_path[4096];
 
 #if defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
 /* Phase 3B.3 controlled runtime test entry (ts2_cheat_external.h). Only in
@@ -72,6 +98,43 @@ ts2_cheat_external_input ts2_cheat_runtime_test_health_input(void)
 }
 #endif
 
+/* 1 when the launcher committed a cheat file path for this activation. */
+static int cheat_file_selected(void)
+{
+    return psx_mod_current_resource_path(TS2_CHEAT_FILE_RESOURCE_ID, cm_file_path,
+                                         (uint32_t)sizeof cm_file_path) &&
+           cm_file_path[0] != '\0';
+}
+
+#if !defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+/* Load the selected cheat file: the session's single build (the loader
+ * itself refuses outside a fresh, unsealed, unreferenced window). Sanitized
+ * diagnostics only. */
+static void load_cheat_file(void)
+{
+    char line[160];
+    size_t i, examined;
+    (void)ts2_cheat_file_load(cm_file_path, &cm_file);
+    cm_file_loaded = 1;
+    (void)ts2_cheat_file_describe(&cm_file, line, sizeof line);
+    printf("cheat-menu: %s%s\n", line,
+           cm_file.file == TS2_CHEAT_FILE_OK || cm_file.file == TS2_CHEAT_FILE_ERR_SEALED
+               ? "" : " - built-in cheats only");
+    examined = cm_file.entries < TS2_CHEAT_EXTERNAL_INPUT_MAX ? cm_file.entries
+                                                              : TS2_CHEAT_EXTERNAL_INPUT_MAX;
+    for (i = 0; i < examined; ++i) {
+        if (cm_file.shape[i] == TS2_CHEAT_ENTRY_OK && cm_file.verdict[i] == TS2_CHEAT_EXT_OK)
+            continue;
+        (void)ts2_cheat_file_describe_entry(&cm_file, i, line, sizeof line);
+        printf("cheat-menu:   %s\n", line);
+    }
+    if (cm_file.entries > examined)
+        printf("cheat-menu:   %u further entries not examined (limit %u)\n",
+               (unsigned)(cm_file.entries - examined), (unsigned)TS2_CHEAT_EXTERNAL_INPUT_MAX);
+    fflush(stdout);
+}
+#endif
+
 static void cheat_menu_activate(void)
 {
     char value[16];
@@ -80,12 +143,17 @@ static void cheat_menu_activate(void)
         psx_mod_current_option_value(TS2_CHEAT_REMEMBER_OPTION, value, sizeof value) &&
         strcmp(value, "true") == 0;
     cm_activated = 1;
+    cm_file_loaded = 0;
     /* New session: the engine lets go of the previous table first; a table
      * still referenced by an attached menu is kept (no rebuild below). */
     ts2_cheat_engine_shutdown();
     fresh = ts2_cheat_session_begin();
-    (void)fresh;
-#if defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+#if !defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+    (void)fresh;    /* the loader checks the window itself */
+    if (cheat_file_selected()) load_cheat_file();
+#else
+    if (cheat_file_selected())
+        printf("cheat-menu: RUNTIME TEST build: external cheat file ignored\n");
     /* Phase 3B.3 controlled runtime test (opt-in CMake option, default
      * OFF): one synthetic external entry through the normal external
      * validation, before the engine is set up. No file, no persistence. */
@@ -130,6 +198,11 @@ int ts2_cheat_menu_activated(void)
 int ts2_cheat_menu_remember_changes(void)
 {
     return cm_remember;
+}
+
+const struct ts2_cheat_file_report *ts2_cheat_menu_file_report(void)
+{
+    return cm_file_loaded ? &cm_file : NULL;
 }
 
 PSX_MOD_CONSTRUCTOR(register_cheat_menu)

@@ -15,8 +15,12 @@ extern "C" {
 #define TS2_CHEAT_MENU_FEATURE_ID "cheat-menu"
 /* Launcher option: remember in-game toggles for the next start. */
 #define TS2_CHEAT_REMEMBER_OPTION "remember-changes"
+/* Launcher resource (manifest [[resource]], format "file"): the optional
+ * external cheat file (ts2_cheat_file.h), read once per activation. */
+#define TS2_CHEAT_FILE_RESOURCE_ID "cheat-file"
 
 struct PsxMenuProvider;
+struct ts2_cheat_file_report;
 
 /* 1 when the Cheat Menu plugin was activated AND its feature is in the
  * currently committed mod plan (a later session in the same process may
@@ -26,6 +30,12 @@ int ts2_cheat_menu_activated(void);
 /* 1 when the launcher option "remember-changes" read exactly "true" at
  * activation; 0 otherwise (unset, any other value, not activated). */
 int ts2_cheat_menu_remember_changes(void);
+
+/* The external cheat file result of the last activation, or NULL when that
+ * activation loaded no file (none selected, or a runtime-test build that
+ * ignores it). Written only during activation (main thread); read-only
+ * afterwards. Holds statuses and counts only, never file content. */
+const struct ts2_cheat_file_report *ts2_cheat_menu_file_report(void);
 
 /* The in-game menu provider (cheat_menu_provider.cpp). */
 const struct PsxMenuProvider *ts2_cheat_menu_provider(void);

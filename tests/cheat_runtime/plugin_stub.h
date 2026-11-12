@@ -31,6 +31,11 @@ typedef struct plugin_stub {
     /* Package option "remember-changes": NULL means "no value". */
     const char *remember_value;
     int option_reads;
+    /* Resource "cheat-file": the committed path, NULL means "none selected"
+     * (psx_mod_current_resource_path; too long for the buffer also reads 0,
+     * as in the runtime). */
+    const char *resource_path;
+    int resource_reads;
 } plugin_stub;
 
 extern plugin_stub g_plugin;
