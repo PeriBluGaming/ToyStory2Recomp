@@ -229,7 +229,13 @@ static void test_engine_and_isolation(void)
     CHECK(g_st[0] == TS2_CHEAT_EXT_OK && g_st[1] == TS2_CHEAT_EXT_ERR_PARSE);
     stub_reset();
 #if !defined(TS2_CHEAT_RUNTIME_TEST_HEALTH)
+    /* Phase 3C.2A order: activation, then the build in a fresh session
+     * window (as the file loader will), then engine activation. */
     activate("true", "true", "true");
+    ts2_cheat_engine_shutdown();
+    CHECK(ts2_cheat_session_begin() == 1);
+    CHECK(ts2_cheat_combined_build(e, 2, g_st) == TS2_CHEAT_BUILD_OK);
+    ts2_cheat_engine_activate();
     CHECK(ts2_cheat_engine_count() == 3u);
     CHECK(ts2_cheat_engine_state_at(0) == TS2_CHEAT_ARMED && ts2_cheat_engine_state_at(1) == TS2_CHEAT_ARMED);
     CHECK(ts2_cheat_engine_state_at(2) == TS2_CHEAT_OFF);      /* off at start */

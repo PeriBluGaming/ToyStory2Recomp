@@ -37,6 +37,26 @@ int psx_mod_register_savestate_plugin(const char *id, PSXModActivationCallback c
     return reg(id, cb, &g_plugin.savestate, &g_plugin.savestate_regs);
 }
 
+int psx_mod_register_option_changed_plugin(const char *id, PSXModOptionChangedCallback cb)
+{
+    if (!id || !cb || strcmp(id, TS2_CHEAT_MENU_PLUGIN_ID) != 0 || g_plugin.option_changed) {
+        ++g_plugin.refused_regs;
+        return 0;
+    }
+    g_plugin.option_changed = cb;
+    ++g_plugin.option_changed_regs;
+    return 1;
+}
+
+int psx_mod_option_live_capable(const char *package_id, const char *feature_id)
+{
+    ++g_plugin.live_capable_queries;
+    if (!package_id || !feature_id || strcmp(package_id, TS2_CHEAT_MENU_PACKAGE_ID) != 0 ||
+        strcmp(feature_id, TS2_CHEAT_MENU_FEATURE_ID) != 0)
+        return 0;
+    return g_plugin.option_changed && !g_plugin.not_in_plan ? 1 : 0;
+}
+
 int psx_mod_current_option_value(const char *option_id, char *out, uint32_t out_size)
 {
     const char *value = NULL;

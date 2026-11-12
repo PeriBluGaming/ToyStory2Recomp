@@ -37,9 +37,33 @@
  * (the file), and the Cheat Menu never persists them (see
  * ts2_cheat_def_is_external).
  *
- * Threading: build once on the main thread during activation, before the
- * engine and the menu are set up. The combined table is immutable afterwards
- * and lives for the rest of the process. */
+ * Threading: build on the main thread during activation, before the engine
+ * and the menu are set up.
+ *
+ * Session lifecycle (Phase 3C.2A). psxrecomp can end a game session and
+ * start another one in the same process (PSX_MENU_EXIT_TO_FRONTEND). The
+ * combined table and everything it points at live in static storage (never
+ * freed), but its CONTENT may only change while nothing uses it:
+ *   - the engine (g_engine.defs) uses it from ts2_cheat_engine_activate()
+ *     until ts2_cheat_engine_shutdown();
+ *   - the menu (cheat_menu_view rows, recomp-ui item labels/keys) uses it
+ *     from the provider's attach to its detach; the provider holds a table
+ *     reference for exactly that time (ts2_cheat_table_ref_acquire/release).
+ * ts2_cheat_session_begin() opens a new build window only when no table
+ * reference is held; ts2_cheat_engine_activate() seals it. While sealed or
+ * referenced, combined_build() refuses (TS2_CHEAT_BUILD_ERR_SEALED) and
+ * leaves the table untouched. The plugin's activation runs
+ *   engine shutdown -> session_begin -> build -> engine activate (seal)
+ * on the main thread, after the previous session was torn down (provider
+ * detached, no VBlank) and before the new provider attach.
+ *
+ * Borrowed pointers: the verified list passed to combined_build_with() is
+ * kept by pointer (ts2_cheat_active_verified) and must outlive every later
+ * engine activation -- static storage in production (ts2_cheat_memory.c)
+ * and in the tests. Built-in definitions are copied by value; their strings
+ * and range arrays must be static (they are, ts2_cheat_table.c). External
+ * entries are copied into static storage; their inputs need only live for
+ * the build call. */
 
 #include <stddef.h>
 
@@ -91,7 +115,8 @@ typedef enum ts2_cheat_build_status {
                                            no external entry accepted (engine decides) */
     TS2_CHEAT_BUILD_ERR_POLICY,         /* external policy invalid / not inside the
                                            verified list: built-ins only */
-    TS2_CHEAT_BUILD_ERR_INTERNAL        /* combined table failed re-validation: built-ins only */
+    TS2_CHEAT_BUILD_ERR_INTERNAL,       /* combined table failed re-validation: built-ins only */
+    TS2_CHEAT_BUILD_ERR_SEALED          /* refused: table sealed or referenced; unchanged */
 } ts2_cheat_build_status;
 
 /* Build the combined table from explicit inputs (tests; the production
@@ -144,7 +169,21 @@ int ts2_cheat_def_is_external(const ts2_cheat_def *d);
 ts2_cheat_external_input ts2_cheat_runtime_test_health_input(void);
 #endif
 
-/* Back to "no combined table" (tests). */
+/* ---- Session lifecycle (Phase 3C.2A), main thread ---------------------- */
+
+/* Open a new session's build window: drops the previous combined table
+ * (back to built-ins only) and unseals. Refused (returns 0, nothing
+ * changes) while a table reference is held. Returns 1 when opened. */
+int ts2_cheat_session_begin(void);
+/* Seal the active table for the session (ts2_cheat_engine_activate). */
+void ts2_cheat_session_seal(void);
+int ts2_cheat_session_sealed(void);
+/* The menu provider holds one reference from attach to detach. */
+void ts2_cheat_table_ref_acquire(void);
+void ts2_cheat_table_ref_release(void);
+unsigned ts2_cheat_table_refs(void);
+
+/* Back to "no combined table", unsealed, no references (tests). */
 void ts2_cheat_combined_reset(void);
 
 const char *ts2_cheat_ext_status_name(ts2_cheat_ext_status status);

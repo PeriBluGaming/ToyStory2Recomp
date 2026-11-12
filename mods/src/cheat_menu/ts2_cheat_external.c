@@ -38,6 +38,12 @@ static struct {
     ext_store ext[TS2_CHEAT_EXTERNAL_MAX];
 } g_comb;
 
+/* Session lifecycle (see the header). */
+static struct {
+    int sealed;
+    unsigned refs;
+} g_life;
+
 /* Scratch for one build: each input's verdict and derived write spans. */
 static struct {
     ts2_cheat_ext_status status[TS2_CHEAT_EXTERNAL_INPUT_MAX];
@@ -287,9 +293,12 @@ ts2_cheat_build_status ts2_cheat_combined_build_with(
         n < TS2_CHEAT_EXTERNAL_INPUT_MAX ? n : TS2_CHEAT_EXTERNAL_INPUT_MAX;
     ts2_cheat_ext_status *st = g_scratch.status;   /* the first `looked` verdicts */
 
-    for (i = 0; i < TS2_CHEAT_EXTERNAL_INPUT_MAX; ++i) st[i] = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
     if (status)
         for (i = 0; i < n; ++i) status[i] = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
+    /* The engine or the menu may hold pointers into the table: refuse and
+     * change nothing (not even the scratch verdicts). */
+    if (g_life.sealed || g_life.refs) return TS2_CHEAT_BUILD_ERR_SEALED;
+    for (i = 0; i < TS2_CHEAT_EXTERNAL_INPUT_MAX; ++i) st[i] = TS2_CHEAT_EXT_ERR_NOT_CHECKED;
     publish_builtins(builtins, nb, verified, nv);
 
     /* Built-ins: as trusted as before; a broken built-in table is the
@@ -416,9 +425,30 @@ int ts2_cheat_def_is_external(const ts2_cheat_def *d)
            d < &g_comb.table[g_comb.count];
 }
 
+int ts2_cheat_session_begin(void)
+{
+    if (g_life.refs) return 0;
+    memset(&g_comb, 0, sizeof g_comb);   /* back to built-ins only */
+    g_life.sealed = 0;
+    return 1;
+}
+
+void ts2_cheat_session_seal(void) { g_life.sealed = 1; }
+int ts2_cheat_session_sealed(void) { return g_life.sealed; }
+
+void ts2_cheat_table_ref_acquire(void) { ++g_life.refs; }
+
+void ts2_cheat_table_ref_release(void)
+{
+    if (g_life.refs) --g_life.refs;
+}
+
+unsigned ts2_cheat_table_refs(void) { return g_life.refs; }
+
 void ts2_cheat_combined_reset(void)
 {
     memset(&g_comb, 0, sizeof g_comb);
+    memset(&g_life, 0, sizeof g_life);
 }
 
 const char *ts2_cheat_ext_status_name(ts2_cheat_ext_status status)

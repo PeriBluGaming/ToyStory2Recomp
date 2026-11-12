@@ -136,6 +136,14 @@ void ts2_cheat_engine_activate(void)
             strcmp(value, "true") == 0;
     }
     (void)ts2_cheat_engine_init_table(defs, n, policy, policy_n, initial);
+    /* From here the engine points into the active table: no rebuild until
+     * the next session (ts2_cheat_external.h). */
+    ts2_cheat_session_seal();
+}
+
+void ts2_cheat_engine_shutdown(void)
+{
+    memset(&g_engine, 0, sizeof g_engine);
 }
 
 ts2_cheat_table_status ts2_cheat_engine_table_status(void) { return g_engine.table; }

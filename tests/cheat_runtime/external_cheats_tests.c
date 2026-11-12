@@ -141,6 +141,22 @@ static void activate(const char *coins, const char *lives, const char *remember)
     g_plugin.activation();
 }
 
+/* The Phase 3C.2A session order with a build in the window, as the plugin's
+ * activation will run it with a file loader: options and activation, then
+ * engine shutdown, a fresh session, the build, engine activation (seal). */
+static ts2_cheat_build_status activate_and_build(const char *coins, const char *lives,
+                                                 const char *remember,
+                                                 const ts2_cheat_external_input *e, size_t n)
+{
+    ts2_cheat_build_status b;
+    activate(coins, lives, remember);
+    ts2_cheat_engine_shutdown();
+    CHECK(ts2_cheat_session_begin() == 1);
+    b = build(e, n);
+    ts2_cheat_engine_activate();
+    return b;
+}
+
 /* ------------------------------------------------------------------------- */
 
 static void test_zero_external(void)
@@ -535,11 +551,12 @@ static void test_all_rejected(void)
     CHECK(active(&n) != NULL && n == 2u && ts2_cheat_active_external_count() == 0u);
     /* Built-ins run as before. */
     stub_reset();
-    activate("true", "true", NULL);
+    CHECK(activate_and_build("true", "true", NULL, e, 3) == TS2_CHEAT_BUILD_OK);
     CHECK(ts2_cheat_engine_count() == 2u);
     CHECK(ts2_cheat_engine_state_at(0) == TS2_CHEAT_ARMED && ts2_cheat_engine_state_at(1) == TS2_CHEAT_ARMED);
     ts2_cheat_engine_vblank();
     CHECK(stub_u16(OFF(0x800B2226u)) == 99 && stub_u16(OFF(0x800B2222u)) == 9);
+    ts2_cheat_combined_reset();                 /* next tests build freely */
 }
 
 static void test_build_refusals(void)
@@ -603,10 +620,10 @@ static void test_engine_and_menu(void)
     e[1] = one("ext-b", "Ext B", LINES("300A0600 0011", "300A0601 0022"), 2);
     e[1].description = "two bytes";
     e[2] = one("broken", "Broken", LINES("800B2226 0001"), 1);   /* rejected */
-    CHECK(build(e, 3) == TS2_CHEAT_BUILD_OK);
-    CHECK(g_st[0] == TS2_CHEAT_EXT_OK && g_st[1] == TS2_CHEAT_EXT_OK && g_st[2] == TS2_CHEAT_EXT_ERR_TARGET);
     stub_reset();
-    activate(NULL, "true", "true");             /* coins off, lives on, remember on */
+    /* coins off, lives on, remember on */
+    CHECK(activate_and_build(NULL, "true", "true", e, 3) == TS2_CHEAT_BUILD_OK);
+    CHECK(g_st[0] == TS2_CHEAT_EXT_OK && g_st[1] == TS2_CHEAT_EXT_OK && g_st[2] == TS2_CHEAT_EXT_ERR_TARGET);
     CHECK(ts2_cheat_engine_count() == 4u);
     CHECK(ts2_cheat_engine_state_at(0) == TS2_CHEAT_OFF);
     CHECK(ts2_cheat_engine_state_at(1) == TS2_CHEAT_ARMED);
@@ -659,6 +676,8 @@ static void test_engine_and_menu(void)
     CHECK(stub_u16(OFF(0x800B2226u)) == 99 && stub_u16(OFF(0x800A0500u)) == 0x1234 &&
           stub_u8(OFF(0x800A0600u)) == 0x11 && stub_u8(OFF(0x800A0601u)) == 0x22);
     CHECK(g_stub.bad_addresses == 0);
+    if (g_ui) { recomp_runtime_ui_destroy(g_ui); g_ui = NULL; }
+    ts2_cheat_combined_reset();                 /* next tests build freely */
 }
 
 static void test_full_capacity_24(void)

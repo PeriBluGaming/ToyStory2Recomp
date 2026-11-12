@@ -18,7 +18,9 @@ extern "C" {
 
 struct PsxMenuProvider;
 
-/* 1 once the resolved mod plan activated the Cheat Menu plugin. */
+/* 1 when the Cheat Menu plugin was activated AND its feature is in the
+ * currently committed mod plan (a later session in the same process may
+ * have dropped it; see cheat_menu_plugin.c). Any thread. */
 int ts2_cheat_menu_activated(void);
 
 /* 1 when the launcher option "remember-changes" read exactly "true" at

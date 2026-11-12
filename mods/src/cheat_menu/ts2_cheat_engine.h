@@ -74,8 +74,12 @@ typedef struct ts2_cheat_engine_stats {
 
 /* Activation: set up every table entry, then enable each one only if the
  * package option named by its id (Max Coins: "max-coins") reads exactly
- * "true" (any other value, or no value, leaves it disabled). */
+ * "true" (any other value, or no value, leaves it disabled). Seals the
+ * active table for the session (ts2_cheat_session_seal). */
 void ts2_cheat_engine_activate(void);
+/* Drop every slot and the table pointer (count 0, nothing runs): the
+ * engine no longer references the active table. Main thread. */
+void ts2_cheat_engine_shutdown(void);
 void ts2_cheat_engine_vblank(void);
 void ts2_cheat_engine_savestate(void);
 

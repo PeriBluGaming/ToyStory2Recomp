@@ -15,6 +15,13 @@ typedef struct plugin_stub {
     int activation_regs, vblank_regs, savestate_regs;
     int refused_regs;          /* duplicate or foreign-id registrations */
     stub_callback activation, vblank, savestate;
+    int option_changed_regs;
+    int (*option_changed)(const char *option_id, const char *value);
+    /* psx_mod_option_live_capable for this feature: "in the committed plan"
+     * once an option-changed callback is registered (runtime semantics).
+     * not_in_plan = 1 simulates a later session without the feature. */
+    int not_in_plan;
+    int live_capable_queries;
     int provider_sets;
     const void *provider;
     /* Package option "max-coins": NULL means "no value". */

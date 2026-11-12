@@ -51,6 +51,7 @@
 #include "cheat_menu.h"
 #include "cheat_menu_chord.h"
 #include "cheat_menu_view.h"
+#include "ts2_cheat_external.h"
 
 #include "psx_menu_host.h"
 #include "recomp_runtime_ui.h"
@@ -78,6 +79,10 @@ bool g_gl_ready = false;
 uint64_t g_last_counter = 0;
 CmChord g_chord{};                     // Select + L3 tracking, under g_mu
 cheat_menu_view g_view;                // rows + cheat bridge, under g_mu
+// The view's rows (and recomp-ui's item labels) point into the active cheat
+// table: hold a table reference from attach to detach so no new session can
+// rebuild it underneath (ts2_cheat_external.h). Main thread, under g_mu.
+bool g_table_ref = false;
 
 // MAIN THREAD ONLY, g_mu held. Hands pending cheat requests (any row) to
 // the engine and refreshes the snapshots the draw callback reads. After a
@@ -247,6 +252,10 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
     if (!host || host->abi_version != PSX_MENU_ABI_VERSION) return 0;
 #if defined(PSX_SDL3)
     if (g_ui) recomp_runtime_ui_destroy(g_ui);
+    if (!g_table_ref) {
+        ts2_cheat_table_ref_acquire();
+        g_table_ref = true;
+    }
     g_host = host;
     g_paused = false;
     cm_chord_reset(&g_chord);
@@ -270,6 +279,8 @@ int p_attach(void *, void *, void *, const PsxMenuHost *host) {
     g_ui = recomp_runtime_ui_create(&cfg);
     if (!g_ui) {
         g_host = nullptr;
+        ts2_cheat_table_ref_release();
+        g_table_ref = false;
         return 0;
     }
     return 1;
@@ -363,6 +374,10 @@ void p_detach(void *) {
     g_paused = false;
     cm_chord_reset(&g_chord);
     cheat_menu_view_set_persist(&g_view, 0, nullptr, nullptr);  // host is gone
+    if (g_table_ref) {   // the view no longer uses the table
+        ts2_cheat_table_ref_release();
+        g_table_ref = false;
+    }
 }
 
 const PsxMenuProvider kProvider = {
