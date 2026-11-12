@@ -14,7 +14,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(psxcheat_runtime_tests LANGUAGES C)
+    project(psxcheat_runtime_tests LANGUAGES C CXX)
     enable_testing()
 endif()
 
@@ -189,6 +189,34 @@ add_executable(ts2_cheat_lifecycle_tests
 target_link_libraries(ts2_cheat_lifecycle_tests PRIVATE
     psxcheat_psxrecomp_testlib ts2_cheat_test_runtime_ui)
 
+# Phase 3C.2B: external cheat file loader (C++17, toml11 from the psxrecomp
+# submodule, read-only) with the real validator; test files are created at
+# run time inside this build tree. Plus a bounded mutation fuzzer.
+set(TS2_TOML11_DIR "${TS2_REPO_ROOT}/psxrecomp/recompiler/lib/toml11")
+add_library(ts2_cheat_file_testlib STATIC "${TS2_CHEAT_MENU_DIR}/ts2_cheat_file.cpp")
+target_include_directories(ts2_cheat_file_testlib SYSTEM PRIVATE "${TS2_TOML11_DIR}")
+target_link_libraries(ts2_cheat_file_testlib PUBLIC psxcheat_psxrecomp_testlib)
+set_target_properties(ts2_cheat_file_testlib PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(ts2_cheat_file_testlib PRIVATE -Wall -Wextra -Werror)
+endif()
+foreach(_ft ts2_cheat_file_tests ts2_cheat_file_fuzz)
+    if(_ft STREQUAL "ts2_cheat_file_tests")
+        set(_src "${CMAKE_CURRENT_LIST_DIR}/cheat_file_tests.c")
+    else()
+        set(_src "${CMAKE_CURRENT_LIST_DIR}/cheat_file_fuzz.c")
+    endif()
+    add_executable(${_ft} "${_src}"
+        "${CMAKE_CURRENT_LIST_DIR}/psx_runtime_stub.c"
+        "${CMAKE_CURRENT_LIST_DIR}/plugin_stub.c"
+        "${TS2_CHEAT_MENU_DIR}/ts2_cheat_engine.c")
+    target_link_libraries(${_ft} PRIVATE ts2_cheat_file_testlib)
+    set_target_properties(${_ft} PROPERTIES LINKER_LANGUAGE CXX)
+endforeach()
+target_compile_definitions(ts2_cheat_file_tests PRIVATE
+    TS2_CHEAT_FILE_TEST_DIR="${CMAKE_CURRENT_BINARY_DIR}/cheat_file_fixtures")
+
 add_executable(ts2_ranges_check "${CMAKE_CURRENT_LIST_DIR}/ts2_ranges_check.c")
 target_link_libraries(ts2_ranges_check PRIVATE psxcheat_psxrecomp_testlib)
 target_compile_definitions(ts2_ranges_check PRIVATE
@@ -198,7 +226,8 @@ foreach(_t psxcheat_psxrecomp_testlib psxcheat_adapter_tests ts2_cheat_engine_te
            ts2_cheat_menu_state_tests ts2_cheat_menu_view_tests
            ts2_cheat_menu_persist_tests ts2_cheat_table_tests ts2_cheat_menu_multi_tests
            ts2_cheat_production_tests ts2_cheat_external_tests ts2_cheat_health_tests
-           ts2_cheat_health_runtime_tests ts2_cheat_lifecycle_tests ts2_ranges_check)
+           ts2_cheat_health_runtime_tests ts2_cheat_lifecycle_tests ts2_cheat_file_tests
+           ts2_cheat_file_fuzz ts2_ranges_check)
     set_target_properties(${_t} PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${_t} PRIVATE -Wall -Wextra -Werror)
@@ -222,4 +251,6 @@ add_test(NAME ts2_cheat_external_tests COMMAND ts2_cheat_external_tests)
 add_test(NAME ts2_cheat_health_tests COMMAND ts2_cheat_health_tests)
 add_test(NAME ts2_cheat_health_runtime_tests COMMAND ts2_cheat_health_runtime_tests)
 add_test(NAME ts2_cheat_lifecycle_tests COMMAND ts2_cheat_lifecycle_tests)
+add_test(NAME ts2_cheat_file_tests COMMAND ts2_cheat_file_tests)
+add_test(NAME ts2_cheat_file_fuzz COMMAND ts2_cheat_file_fuzz)
 add_test(NAME ts2_ranges_check COMMAND ts2_ranges_check)
