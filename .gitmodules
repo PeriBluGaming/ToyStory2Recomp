@@ -1,7 +1,7 @@
 [submodule "psxrecomp"]
 	path = psxrecomp
 	url = https://github.com/PeriBluGaming/psxrecomp.git
-	branch = switch-port
+	branch = switch-port-ts2
 [submodule "recomp-ui"]
 	path = recomp-ui
 	url = https://github.com/RetroPortingToolKit/recomp-ui.git
